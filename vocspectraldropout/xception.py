@@ -123,7 +123,7 @@ class Exit(nn.Module):
                   out_channels=block_out_channels,
                   stride=2,
                   maxpool_out=True),
-            DepthwiseSeparableConv(block_out_channels, exit_1_channels, kernel_size=3, padding=1),
+            DepthwiseSeparableConv(block_out_channels, exit_1_channels, kernel_size=3, padding=1, dilation=2),
             nn.BatchNorm2d(exit_1_channels),
             nn.ReLU(inplace=False),
             DepthwiseSeparableConv(exit_1_channels, exit_2_channels, kernel_size=3, padding=1),
