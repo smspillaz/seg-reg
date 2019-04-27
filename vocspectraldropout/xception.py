@@ -140,7 +140,7 @@ class Exit(nn.Module):
         return self.net(x)
 
 
-class Xception(nn.module):
+class Xception(nn.Module):
     """Compose the entry, middle and exit layers."""
 
     def __init__(self, in_channels, layers, out_channels):
