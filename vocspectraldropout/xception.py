@@ -133,7 +133,7 @@ class Exit(nn.Module):
             # Exit from 1536 channels to 2048 channels
             DepthwiseSeparableConv(exit_1_channels, exit_2_channels, kernel_size=3, padding=1, dilation=2),
             nn.BatchNorm2d(exit_2_channels),
-            nn.ReLU(inplace=False) 
+            nn.ReLU(inplace=False)
         )
 
     def forward(self, x):
