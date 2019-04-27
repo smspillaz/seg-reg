@@ -63,7 +63,7 @@ class Block(nn.Module):
         ] if n_convs > 2 else []) + ([
             nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=1)
         ] if maxpool_out else [])
-            
+
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -189,5 +189,3 @@ class FeatureMapClassifier(nn.Module):
 
         return torch.log_softmax(self.linear(x), -1)
 
-
-    
