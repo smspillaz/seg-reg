@@ -130,6 +130,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--random-seed", type=int, default=10)
+    parser.add_argument("--layers", type=int, default=8)
     args = parser.parse_args()
 
     np.random.seed(10)
@@ -141,7 +142,7 @@ def main():
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     net = nn.Sequential(
-        Xception(3, 8, 2048),
+        Xception(3, args.layers, 2048),
         FeatureMapClassifier(2048, 10)
     ).to(device)
     print(net)
