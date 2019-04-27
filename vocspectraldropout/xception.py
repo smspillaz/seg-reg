@@ -126,7 +126,12 @@ class Exit(nn.Module):
             DepthwiseSeparableConv(block_out_channels, exit_1_channels, kernel_size=3, padding=1, dilation=2),
             nn.BatchNorm2d(exit_1_channels),
             nn.ReLU(inplace=False),
-            DepthwiseSeparableConv(exit_1_channels, exit_2_channels, kernel_size=3, padding=1),
+            # Modification to original Xception, additional block with same number of channels
+            DepthwiseSeparableConv(exit_1_channels, exit_1_channels, kernel_size=3, padding=1, dilation=2),
+            nn.BatchNorm2d(exit_1_channels),
+            nn.ReLU(inplace=False),
+            # Exit from 1536 channels to 2048 channels
+            DepthwiseSeparableConv(exit_1_channels, exit_2_channels, kernel_size=3, padding=1, dilation=2),
             nn.BatchNorm2d(exit_2_channels),
             nn.ReLU(inplace=False) 
         )
