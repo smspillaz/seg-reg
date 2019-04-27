@@ -1,5 +1,16 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+
+def fixed_padding(inputs, kernel_size, dilation):
+    """Apply padding for dilations."""
+    kernel_size_effective = kernel_size + (kernel_size - 1) * (dilation - 1)
+    pad_total = kernel_size_effective - 1
+    pad_beg = pad_total // 2
+    pad_end = pad_total - pad_beg
+    padded_inputs = F.pad(inputs, (pad_beg, pad_end, pad_beg, pad_end))
+    return padded_inputs
 
 
 class DepthwiseSeparableConv(nn.Module):
@@ -14,13 +25,14 @@ class DepthwiseSeparableConv(nn.Module):
         self.depthwise = nn.Conv2d(nin,
                                    nin,
                                    kernel_size=kernel_size,
-                                   padding=padding,
+                                   padding=0,
                                    dilation=dilation,
                                    groups=nin,
                                    bias=bias)
         self.pointwise = nn.Conv2d(nin, nout, kernel_size=1, bias=bias)
 
     def forward(self, x):
+        x = fixed_padding(x, self.depthwise.kernel_size[0], dilation=self.depthwise.dilation[0])
         out = self.depthwise(x)
         out = self.pointwise(out)
         return out
