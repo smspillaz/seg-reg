@@ -173,7 +173,7 @@ def main():
             training_progress.set_postfix(loss=loss)
 
         gc.collect()
-        torch.cuda.empty_cache() 
+        torch.cuda.empty_cache()
 
         tqdm.write('Validation set accuracy (epoch {}): {}'.format(epoch,
                                                                    test(net, tqdm(val_dataloader, desc='Validating'), device)))
