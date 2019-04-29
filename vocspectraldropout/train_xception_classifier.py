@@ -123,6 +123,19 @@ def test(network, test_dataloader, device):
     return np.mean(accuracies)
 
 
+class XceptionClassifier(nn.Module):
+    """A classifier that uses exception."""
+
+    def __init__(self, in_channels, out_channels, classes, layers, initialization):
+        super().__init__()
+        #self.xception = AlignedXception(16, nn.BatchNorm2d, pretrained=False)
+        self.xception = Xception(in_channels, layers, out_channels, initialization=initialization)
+        self.classifier = FeatureMapClassifier(out_channels, classes)
+
+    def forward(self, x):
+        x, _ = self.xception(x)
+        return self.classifier(x)
+
 
 
 def main():
