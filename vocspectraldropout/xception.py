@@ -84,25 +84,35 @@ class Entry(nn.Module):
         super().__init__()
 
         block_channel_pairs = block_channel_pairs or ((64, 128), (128, 256), (256, 728))
+        low_level_block_channel_pair, rest_block_channel_pairs = block_channel_pairs[0], block_channel_pairs[1:]
 
-        self.net = nn.Sequential(
+        self.low_level_net = nn.Sequential(
             nn.Conv2d(in_channels, 32, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=False),
             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=False),
+            Block(in_channels=low_level_block_channel_pair[0],
+                  kernel_size=3,
+                  middle_channels=low_level_block_channel_pair[1],
+                  out_channels=low_level_block_channel_pair[1],
+                  stride=2,
+                  maxpool_out=True)
+        )
+        self.rest_net = nn.Sequential(
             *[Block(in_channels=in_block_channels,
                     kernel_size=3,
                     middle_channels=out_block_channels,
                     out_channels=out_block_channels,
                     stride=2,
                     maxpool_out=True)
-              for in_block_channels, out_block_channels in block_channel_pairs]
+              for in_block_channels, out_block_channels in rest_block_channel_pairs]
         )
 
     def forward(self, x):
-        return self.net(x)
+        low_level_feat = self.low_level_net(x)
+        return self.rest_net(low_level_feat), torch.relu(low_level_feat)
 
 
 class Middle(nn.Module):
@@ -166,14 +176,15 @@ class Xception(nn.Module):
     def __init__(self, in_channels, layers, out_channels):
         super().__init__()
 
+        self.entry = Entry(in_channels)
         self.net = nn.Sequential(
-            Entry(in_channels),
             Middle(channels=728, repeat=layers),
             Exit(728, 1024, 1536, out_channels),
         )
 
     def forward(self, x):
-        return self.net(x)
+        x, low_level = self.entry(x)
+        return self.net(x), low_level
 
 
 
