@@ -147,6 +147,7 @@ def main():
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--random-seed", type=int, default=10)
     parser.add_argument("--layers", type=int, default=8)
+    parser.add_argument("--initialization", action="store_true", default=False)
     args = parser.parse_args()
 
     np.random.seed(10)
