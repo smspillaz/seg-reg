@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import numpy as np
+
 
 def fixed_padding(inputs, kernel_size, dilation):
     """Apply padding for dilations."""
