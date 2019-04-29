@@ -173,7 +173,7 @@ class Exit(nn.Module):
 class Xception(nn.Module):
     """Compose the entry, middle and exit layers."""
 
-    def __init__(self, in_channels, layers, out_channels):
+    def __init__(self, in_channels, layers, out_channels, initialization=False):
         super().__init__()
 
         self.entry = Entry(in_channels)
@@ -181,6 +181,18 @@ class Xception(nn.Module):
             Middle(channels=728, repeat=layers),
             Exit(728, 1024, 1536, out_channels),
         )
+        if initialization:
+            self._init_weights()
+
+    def _init_weights(self):
+        """Do weight initlaization."""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+                m.weight.data.normal_(0, np.sqrt(2.0 / n))
+            elif isinstance(m, nn.BatchNorm2d):
+                m.weight.data.fill_(1)
+                m.bias.data.zero_()
 
     def forward(self, x):
         x, low_level = self.entry(x)
