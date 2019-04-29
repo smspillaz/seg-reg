@@ -23,6 +23,8 @@ from xception import (
     Xception
 )
 
+from other.xception import AlignedXception
+
 
 IMAGE_NORMALIZATION_WEIGHTS = ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
 
