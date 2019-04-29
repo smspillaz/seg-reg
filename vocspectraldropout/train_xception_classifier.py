@@ -158,10 +158,7 @@ def main():
     train_dataloader, val_dataloader, test_dataloader = create_data_loaders(*datasets, args.batch_size)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    net = nn.Sequential(
-        Xception(3, args.layers, 2048),
-        FeatureMapClassifier(2048, 10)
-    ).to(device)
+    net = XceptionClassifier(3, 2048, 10, args.layers, args.initialization).to(device)
     print(net)
     criterion = nn.NLLLoss()
     optimizer = optim.SGD(net.parameters(), lr=args.learning_rate, momentum=0.9)
