@@ -22,13 +22,14 @@ class DepthwiseSeparableConv(nn.Module):
     image and stack them together to get input_channels channels back.
     Then, we "merge" the result by doing a pointwise convolution using
     a 1x1 kernel, which returns output_channels channels."""
-    def __init__(self, nin, nout, kernel_size, padding, bias=False, dilation=1):
+    def __init__(self, nin, nout, kernel_size, padding, bias=False, dilation=1, stride=1):
         super(DepthwiseSeparableConv, self).__init__()
         self.depthwise = nn.Conv2d(nin,
                                    nin,
                                    kernel_size=kernel_size,
                                    padding=0,
                                    dilation=dilation,
+                                   stride=stride,
                                    groups=nin,
                                    bias=bias)
         self.pointwise = nn.Conv2d(nin, nout, kernel_size=1, bias=bias)
@@ -63,7 +64,11 @@ class Block(nn.Module):
             DepthwiseSeparableConv(out_channels, out_channels, kernel_size=kernel_size, padding=1),
             nn.BatchNorm2d(out_channels)
         ] if n_convs > 2 else []) + ([
-            nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=1)
+            # Change from DeepLab: Instead of max pooling,
+            # perform another convolution, but with the given
+            # stride (this downsamples the image)
+            DepthwiseSeparableConv(out_channels, out_channels, kernel_size=kernel_size, padding=1, stride=stride)
+            # nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=1)
         ] if maxpool_out else [])
 
         self.net = nn.Sequential(*layers)
