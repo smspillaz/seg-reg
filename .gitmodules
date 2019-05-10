@@ -1,3 +1,6 @@
 [submodule "submodules/deeplab"]
 	path = submodules/deeplab
 	url = git@github.com:smspillaz/pytorch-deeplab-xception.git
+[submodule "submodules/Deeplab-v3plus"]
+	path = submodules/Deeplab-v3plus
+	url = git@github.com:smspillaz/Deeplab-v3plus.git
