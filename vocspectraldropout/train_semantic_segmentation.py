@@ -432,8 +432,8 @@ def main():
                                                 ignore_index=255,
                                                 device=device)
     optimizer = optim.SGD(differential_learning_rates(model, [
-                              ((model.feature_detection_layers, ), 10),
-                              ((model.spatial_pyramid_pooling, model.decoder), 1)
+                              ((model.feature_detection_layers, ), 1),
+                              ((model.spatial_pyramid_pooling, model.decoder), 10)
                           ], args.learning_rate),
                           momentum=0.9,
                           weight_decay=5e-4,
