@@ -416,6 +416,14 @@ def training_loop(model,
                     "best_pred": best_accumulated_miou
                 })
 
+
+def call_many(*functions):
+    def _inner(*args, **kwargs):
+        return [f(*args, **kwargs) for f in functions]
+
+    return _inner
+
+
 def main():
     """Entry point."""
     parser = argparse.ArgumentParser("Train semantic segmentation model.")
