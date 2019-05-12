@@ -437,7 +437,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
     parser.add_argument("--num-classes", type=int, default=21, help="Number of segmentation classes")
     parser.add_argument("--save-to", type=str, help="Where to save the model to", required=True)
-    parser.add_argument("--log-statistics", type=str, help="Where to log statistics to", default="statistics")
+    parser.add_argument("--log-statistics", type=str, help="Where to log statistics to", default="logs/statistics")
     parser.add_argument("--cuda", action="store_true", help="Use CUDA")
     parser.add_argument("--test-only", action="store_true", help="Only test")
     parser.add_argument("--load-from", type=str, help="Where to load the model from")
