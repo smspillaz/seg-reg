@@ -379,16 +379,20 @@ def hide_axis(figure):
     return figure
 
 
+def save_input_image(input, path):
+    """Save the input image tensor somewhere."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    img = input.cpu().numpy().transpose(1, 2, 0) / 255.0
+    hide_axis(sns.mpl.pyplot.imshow(img).get_figure()).savefig(path,
+                                                               bbox_inches="tight",
+                                                               pad_inches=0)
+    sns.mpl.pyplot.clf()
+
+
 def save_segmentations_for_image(model, input, label, path):
     """Do segmentation for a few images and save the result to a PNG."""
     # First, save the input in path too
-    input_img = input.cpu().numpy().transpose(1, 2, 0) / 255.0
-    input_path = splice_into_path(path, "input")
-    os.makedirs(os.path.dirname(input_path), exist_ok=True)
-    hide_axis(sns.mpl.pyplot.imshow(input_img).get_figure()).savefig(input_path,
-                                                                     bbox_inches='tight',
-                                                                     pad_inches=0)
-    sns.mpl.pyplot.clf()
+    save_input_image(input, splice_into_path(path, "input"))
     save_segmentation(label.cpu().numpy(), splice_into_path(path, "label"))
 
     def _inner(statistics):
