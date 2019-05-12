@@ -406,6 +406,68 @@ def save_segmentations_for_image(model, input, label, path):
     return _inner
 
 
+def save_model_and_optimizer(path):
+    def _inner(model, optimizer, val_loader, mious, epoch):
+        if path:
+            torch.save({
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "epoch": epoch,
+                "best_pred": mious.mean()
+            }, path)
+
+    return _inner
+
+
+def save_model_on_better_miou(path, initial_best_miou):
+    """Save the model if we have a better miou."""
+    best_miou = initial_best_miou
+    save_func = save_model_and_optimizer(path)
+
+    def _inner(model, optimizer, val_loader, mious, epoch):
+        nonlocal best_miou
+        miou = mious.mean()
+        if miou > best_miou:
+            best_miou = miou
+            save_func(model, optimizer, val_loader, mious, epoch)
+
+    return _inner
+
+
+def save_interesting_images(path, device):
+    """Save some interesting images from the validation process on each epoch.
+
+    'Interesting' is defined as the three images with the best segmentation,
+    the three images with the worst segmentation and the three images in the
+    middle.
+    """
+    def save_pairs(model, pairs, epoch, tag):
+        """Helper to save pairs of images."""
+        for i, pair in enumerate(pairs):
+            epoch_path = splice_into_path(path, ".".join([tag, str(i), "epoch{:02d}".format(epoch)]))
+            save_input_image(pair["image"], splice_into_path(epoch_path, "input"))
+            save_segmentation(pair["label"], splice_into_path(epoch_path, "label"))
+            segment_and_save(model, pair["image"].to(device), splice_into_path(epoch_path, "segmentation"))
+
+    def _inner(model, optimizer, val_loader, mious, epoch):
+        ordered_mious = mious.argsort()
+        viewable_val_loader = val_loader.dataset.with_viewable_transforms()
+
+        length = len(ordered_mious)
+        middle = (length - 1) // 2
+        worst_three = [viewable_val_loader[i] for i in ordered_mious[:3]]
+        best_three = [viewable_val_loader[i] for i in ordered_mious[-3:]]
+        middle_three = [viewable_val_loader[i] for i in ordered_mious[middle - 1:middle + 1]]
+
+        # Now that we have the worst, best and middle images,
+        # save them
+        save_pairs(model, worst_three, epoch, "worst")
+        save_pairs(model, best_three, epoch, "best")
+        save_pairs(model, middle_three, epoch, "middle")
+
+    return _inner
+
+
 def training_loop(model,
                   train_loader,
                   val_loader,
