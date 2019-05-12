@@ -18,7 +18,9 @@ class Block(nn.Module):
                  out_channels,
                  stride=1,
                  dilation=1,
-                 downsample=None):
+                 downsample=None,
+                 drop_rate= 0.0
+                ):
         super().__init__()
 
         self.net = nn.Sequential(OrderedDict([
@@ -39,6 +41,8 @@ class Block(nn.Module):
                                 bias=False)),
             ("bn2", nn.BatchNorm2d(out_channels)),
             ("relu2", nn.ReLU(inplace=False)),
+            #TODO: Added a channel dropout layer here
+            ("dropout2",nn.Dropout2d(p=drop_rate)),
             # 1x1 Convlution to increase the number of planes
             ("conv3", nn.Conv2d(out_channels,
                                 out_channels * Block.CHANNEL_EXPANSION,
@@ -72,7 +76,9 @@ class BlockGroup(nn.Module):
                  output_channels,
                  layers,
                  stride=1,
-                 dilation=1):
+                 dilation=1,
+                 drop_rate=0.0
+                ):
         """Initialize the group of blocks."""
         super().__init__()
 
@@ -81,14 +87,17 @@ class BlockGroup(nn.Module):
             Block(input_channels,
                   output_channels,
                   stride=stride,
-                  dilation=dilation)
+                  dilation=dilation,
+                  drop_rate=drop_rate)
         ] + [
             # Now, go from output_channels * CHANNEL_EXPANSION to
             # output_channels * CHANNEL_EXPANSION, but with no
             # downsampling via stride
             Block(output_channels * Block.CHANNEL_EXPANSION,
                   output_channels,
-                  dilation=dilation)
+                  dilation=dilation,
+                  drop_rate=drop_rate
+                 )
             for i in range(1, layers)
         ]))
 
@@ -105,7 +114,9 @@ class ExpandingBlockGroup(nn.Module):
                  output_channels,
                  blocks,
                  stride=1,
-                 dilation=1):
+                 dilation=1,
+                 drop_rate=0.0
+                ):
         """Initialize the group of blocks."""
         super().__init__()
 
@@ -114,14 +125,18 @@ class ExpandingBlockGroup(nn.Module):
             Block(input_channels,
                   output_channels,
                   stride=stride,
-                  dilation=dilation)
+                  dilation=dilation,
+                  drop_rate=drop_rate
+                 )
         ] + [
             # Now, go from output_channels * CHANNEL_EXPANSION to
             # output_channels * CHANNEL_EXPANSION, but with no
             # downsampling via stride
             Block(output_channels * Block.CHANNEL_EXPANSION,
                   output_channels,
-                  dilation=dilation * blocks[i])
+                  dilation=dilation * blocks[i],
+                  drop_rate=drop_rate
+                 )
             for i in range(1, len(blocks))
         ]))
 
@@ -153,7 +168,9 @@ class ResNet(nn.Module):
     def __init__(self,
                  input_channels,
                  block_layers,
-                 load_pretrained=None):
+                 load_pretrained=None,
+                 drop_rate=0.0
+                ):
         """Initialize the resnet."""
         super().__init__()
 
@@ -168,14 +185,15 @@ class ResNet(nn.Module):
             ("bn1", nn.BatchNorm2d(start_channels)),
             ("relu", nn.ReLU(inplace=True)),
             ("maxpool", nn.MaxPool2d(kernel_size=3, stride=2, padding=1)),
-            ("low_level_block", BlockGroup(start_channels, start_channels, block_layers[0], stride=1, dilation=1))
+            ("low_level_block", BlockGroup(start_channels, start_channels, block_layers[0], stride=1, dilation=1,drop_rate=drop_rate))
         ]))
         self.net = nn.Sequential(OrderedDict(([
             ("layer{}".format(i + 1), BlockGroup(start_channels * (2 ** (i - 1)) * Block.CHANNEL_EXPANSION,
                                                  start_channels * (2 ** i),
                                                  block_layers[i],
                                                  dilation=1,
-                                                 stride=2))
+                                                 stride=2,
+                                                 drop_rate=drop_rate))
             for i in range(1, len(block_layers))
         ] + [
             ("layer{}".format(len(block_layers) + 1),
@@ -183,7 +201,8 @@ class ResNet(nn.Module):
                                  start_channels * (2 ** len(block_layers)),
                                  [2 ** i for i in range(len(block_layers))],
                                  stride=1,
-                                 dilation=2))
+                                 dilation=2,
+                                 drop_rate=drop_rate))
         ])))
 
         self.initialize_weights()
@@ -232,8 +251,9 @@ class ResNet(nn.Module):
         self.load_state_dict(new_state_dict)
 
 
-def build_backbone(input_channels):
+def build_backbone(input_channels,drop_rate=0.0):
     return ResNet(input_channels,
                   [3, 4, 23],
-                  load_pretrained="https://download.pytorch.org/models/resnet101-5d3b4d8f.pth")
+                  load_pretrained="https://download.pytorch.org/models/resnet101-5d3b4d8f.pth",
+                  drop_rate=drop_rate)
 
