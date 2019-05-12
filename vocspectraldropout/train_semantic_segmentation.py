@@ -477,11 +477,10 @@ def training_loop(model,
                   device,
                   epochs,
                   statistics_callback=None,
-                  save_callback=None,
-                  start_epoch=0,
-                  best_accumulated_miou=0):
+                  epoch_end_callback=None,
+                  start_epoch=0):
     """The main training loop."""
-    save_callback = save_callback or (lambda x: None)
+    epoch_end_callback = epoch_end_callback or (lambda x: None)
     statistics_callback = statistics_callback or (lambda x: None)
 
     for epoch in tqdm.tqdm(range(start_epoch, epochs + start_epoch), desc="Epoch"):
@@ -526,13 +525,16 @@ def training_loop(model,
             accumulated_loss = 0
             accumulated_miou = 0
 
+            mious = []
+
             for batch_index, batch in enumerate(progress):
                 source_batch = batch['image'].to(device)
                 target_batch = batch['label'].to(device)
 
                 output_batch = model(source_batch)
                 loss = criterion(output_batch, target_batch)
-                miou = calculate_mean_miou(output_batch, target_batch)
+                batch_mious = list(calculate_many_mious(output_batch, target_batch))
+                miou = np.array(batch_mious).mean()
                 # Update progress bar
                 progress.set_postfix({
                     'loss': loss.item(),
@@ -550,20 +552,16 @@ def training_loop(model,
 
                 accumulated_loss += loss.item()
                 accumulated_miou += miou
+                mious += batch_mious
 
             tqdm.tqdm.write("Epoch {}, Validation loss: {}, Validation mIoU: {}".format(epoch,
                                                                                         accumulated_loss / len(val_loader),
                                                                                         accumulated_miou / len(val_loader)))
 
 
-            if accumulated_miou > best_accumulated_miou:
-                best_accumulated_miou = accumulated_miou
-                save_callback({
-                    "state_dict": model.state_dict(),
-                    "optimizer": optimizer.state_dict(),
-                    "epoch": epoch,
-                    "best_pred": best_accumulated_miou
-                })
+            # Now that we have all mious, we can find the indices of "interesting" ones (eg, ones
+            # that did well, ones that did badly...
+            epoch_end_callback(model, optimizer, val_loader, np.array(mious), epoch)
 
 
 def call_many(*functions):
@@ -655,9 +653,15 @@ def main():
                                                          ))
                             for i in range(0, 3)]
                       ),
-                      save_callback=save_model(args.save_to),
-                      start_epoch=start_epoch,
-                      best_accumulated_miou=best_accumulated_miou)
+                      epoch_end_callback=call_many(
+                          save_model_on_better_miou(args.save_to,
+                                                    best_accumulated_miou),
+                          save_interesting_images(os.path.join(args.save_interesting_images,
+                                                               "interesting",
+                                                               "image.png"),
+                                                  device)
+                      ),
+                      start_epoch=start_epoch)
 
 if __name__ == "__main__":
     main()
