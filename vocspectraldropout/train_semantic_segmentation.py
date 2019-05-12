@@ -272,8 +272,9 @@ def save_model(path):
     return _inner
 
 
-def log_statistics(path="statistics", append=False):
+def log_statistics(path, append=False):
     """Log the statistics to path."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     stream = open(path, "w+" if append else "w")
 
     def _inner(statistics):
