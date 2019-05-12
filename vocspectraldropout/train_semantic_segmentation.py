@@ -181,10 +181,29 @@ class SpecifiedSegmentationImagesDataset(data.Dataset):
         target_image = Image.open(self.target_images[index])
 
         # The transforms operate on pairs of images defined as so
-        return self.transforms({
+        output = self.transforms({
             "image": source_image,
             "label": target_image
         })
+        output.update({
+            "paths": {
+                "image": self.source_images[index],
+                "label": self.target_images[index]
+            }
+        })
+
+        return output
+
+    def with_viewable_transforms(self):
+        """Loader with transforms that are still human-viewable."""
+        return SpecifiedSegmentationImagesDataset(
+            self.images_list,
+            self.source_images_path,
+            self.target_images_path,
+            transforms.Compose([
+                t for t in self.transforms.transforms if not isinstance(t, Normalize)
+            ])
+        )
 
 
 def load_data(source_images,
