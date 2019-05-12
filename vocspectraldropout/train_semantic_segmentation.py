@@ -391,7 +391,7 @@ def training_loop(model,
                 })
                 statistics_callback({
                     'epoch': epoch,
-                    'mode': 'train',
+                    'mode': 'validation',
                     'batch_index': batch_index,
                     'statistics': {
                         'loss': loss.item(),
