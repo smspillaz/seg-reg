@@ -38,10 +38,10 @@ from spatial_pyramid_pooling import SpatialPoolingPyramid
 class DeepLabModel(nn.Module):
     """DeepLabv3+ Model."""
 
-    def __init__(self, input_channels=3, num_classes=21):
+    def __init__(self, input_channels=3, num_classes=21, drop_rate=0.0):
         """Initialize parameters."""
         super().__init__()
-        self.feature_detection_layers = build_backbone(input_channels)
+        self.feature_detection_layers = build_backbone(input_channels,drop_rate=drop_rate)
         self.spatial_pyramid_pooling = SpatialPoolingPyramid(
             input_channels=2048,
             dilations=(6, 12, 18),
@@ -269,6 +269,7 @@ def save_model(path):
     def _inner(info):
         """If the path is defined, save the model."""
         if path:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
             torch.save(info, path)
 
     return _inner
@@ -281,6 +282,7 @@ def log_statistics(path, append=False):
 
     def _inner(statistics):
         stream.write(json.dumps(statistics) + "\n")
+        stream.flush()
 
     return _inner
 
@@ -324,13 +326,8 @@ def calculate_mean_miou(output_batch, target_batch):
 
 def visualize_segmentation(segmented_image, num_classes=21):
     """Visualize segmentation."""
-    cmap = sns.color_palette("gist_ncar", num_classes)
-    ax = sns.heatmap(segmented_image,
-                     cmap=cmap,
-                     cbar=False,
-                     xticklabels=False,
-                     yticklabels=False)
-    return ax.get_figure()
+    fig = hide_axis(sns.mpl.pyplot.imshow(segmented_image).get_figure())
+    return fig
 
 
 def save_segmentation(segmented_image, path, num_classes=21):
@@ -409,6 +406,7 @@ def save_segmentations_for_image(model, input, label, path):
 def save_model_and_optimizer(path):
     def _inner(model, optimizer, val_loader, mious, epoch):
         if path:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
             torch.save({
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
@@ -582,6 +580,7 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=0.007, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
+    parser.add_argument("--drop-rate", type=float, default=0.0, help="Dropout2D rate")
     parser.add_argument("--num-classes", type=int, default=21, help="Number of segmentation classes")
     parser.add_argument("--save-to", type=str, help="Where to save the model to", required=True)
     parser.add_argument("--log-statistics", type=str, help="Where to log statistics to", default="logs/statistics")
@@ -601,7 +600,7 @@ def main():
                               batch_size=args.batch_size)
     device = 'cuda' if args.cuda else 'cpu'
     model = DeepLabModel(input_channels=3,
-                         num_classes=args.num_classes).to(device)
+                         num_classes=args.num_classes, drop_rate = args.drop_rate).to(device)
     print(model)
     criterion = segmentation_cross_entropy_loss(size_average=None,
                                                 ignore_index=255,
