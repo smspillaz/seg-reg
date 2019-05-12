@@ -441,6 +441,7 @@ def main():
     parser.add_argument("--cuda", action="store_true", help="Use CUDA")
     parser.add_argument("--test-only", action="store_true", help="Only test")
     parser.add_argument("--load-from", type=str, help="Where to load the model from")
+    parser.add_argument("--save-interesting-images", type=str, help="Where to save interesting images", default="logs")
     args = parser.parse_args()
 
     (train_loader,
