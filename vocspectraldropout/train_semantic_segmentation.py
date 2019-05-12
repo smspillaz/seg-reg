@@ -146,7 +146,6 @@ def check_exists(path):
     return path
 
 
-
 class SpecifiedSegmentationImagesDataset(data.Dataset):
     """Segmentation dataset.
 
