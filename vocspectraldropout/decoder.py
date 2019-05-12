@@ -45,6 +45,7 @@ class Decoder(nn.Module):
                        stride=1,
                        padding=1,
                        bias=False),
+            # XXX: This is a potential place to apply channel dropout
             nn.Dropout(0.5),
             ConvBNReLU(pyramid_output_channels,
                        pyramid_output_channels,
