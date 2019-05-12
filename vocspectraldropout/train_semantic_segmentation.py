@@ -4,6 +4,7 @@ import json
 import sys
 
 import numpy as np
+import seaborn as sns
 
 import torch
 import torch.optim as optim
@@ -13,6 +14,8 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 
 import tqdm
+
+from contextlib import contextmanager
 
 from torch.utils.data import DataLoader
 
@@ -319,6 +322,86 @@ def calculate_mean_miou(output_batch, target_batch):
     return np.array(list(calculate_many_mious(output_batch, target_batch))).mean()
 
 
+def visualize_segmentation(segmented_image, num_classes=21):
+    """Visualize segmentation."""
+    cmap = sns.color_palette("gist_ncar", num_classes)
+    ax = sns.heatmap(segmented_image,
+                     cmap=cmap,
+                     cbar=False,
+                     xticklabels=False,
+                     yticklabels=False)
+    return ax.get_figure()
+
+
+def save_segmentation(segmented_image, path, num_classes=21):
+    """Save a segmentation somewhere."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    visualize_segmentation(segmented_image).savefig(path,
+                                                    bbox_inches="tight",
+                                                    pad_inches=0)
+    sns.mpl.pyplot.clf()
+
+
+@contextmanager
+def evaluation(model):
+    """Put the model into evaluation mode and disable backprop."""
+    train = model.training
+
+    with torch.no_grad():
+        try:
+            model.eval()
+            yield
+        finally:
+            if train:
+                model.train()
+
+
+def segment_and_save(model, input, path):
+    """Segment a single image image and save it."""
+    with evaluation(model):
+        output = model(input.unsqueeze(0))
+        pred = output.detach()[0].cpu().numpy().argmax(axis=0)
+        save_segmentation(pred, path)
+
+
+def splice_into_path(path, splice):
+    """Splice something into path, before the extension."""
+    dirname = os.path.dirname(path)
+    filename, ext = os.path.splitext(os.path.basename(path))
+
+    return os.path.join(dirname, "{}.{}{}".format(filename, splice, ext))
+
+
+def hide_axis(figure):
+    """Hide axis on figure."""
+    figure.axes[0].get_xaxis().set_visible(False)
+    figure.axes[0].get_yaxis().set_visible(False)
+    return figure
+
+
+def save_segmentations_for_image(model, input, label, path):
+    """Do segmentation for a few images and save the result to a PNG."""
+    # First, save the input in path too
+    input_img = input.cpu().numpy().transpose(1, 2, 0) / 255.0
+    input_path = splice_into_path(path, "input")
+    os.makedirs(os.path.dirname(input_path), exist_ok=True)
+    hide_axis(sns.mpl.pyplot.imshow(input_img).get_figure()).savefig(input_path,
+                                                                     bbox_inches='tight',
+                                                                     pad_inches=0)
+    sns.mpl.pyplot.clf()
+    save_segmentation(label.cpu().numpy(), splice_into_path(path, "label"))
+
+    def _inner(statistics):
+        """Use statistics to save the file."""
+        if statistics["mode"] != "train" or statistics["batch_index"] != 0:
+            return
+
+        epoch_path = splice_into_path(path, "epoch.{:02d}".format(statistics["epoch"]))
+        segment_and_save(model, input, epoch_path)
+
+    return _inner
+
+
 def training_loop(model,
                   train_loader,
                   val_loader,
@@ -483,6 +566,7 @@ def main():
                                                 len(train_loader))
 
     if not args.test_only:
+        val_loader_with_viewable_transforms = val_loader.dataset.with_viewable_transforms()
         training_loop(model,
                       train_loader,
                       val_loader,
@@ -491,7 +575,20 @@ def main():
                       scheduler,
                       device,
                       epochs=args.epochs,
-                      statistics_callback=log_statistics(args.log_statistics, args.load_from is not None),
+                      statistics_callback=call_many(
+                          log_statistics(args.log_statistics,
+                                         args.load_from is not None),
+                          # Take the first image from the first three batches
+                          *[save_segmentations_for_image(model,
+                                                         val_loader_with_viewable_transforms[i]["image"].to(device),
+                                                         val_loader_with_viewable_transforms[i]["label"].to(device),
+                                                         os.path.join(
+                                                             args.save_interesting_images,
+                                                             "segmentations",
+                                                             "image_{}.png".format(i)
+                                                         ))
+                            for i in range(0, 3)]
+                      ),
                       save_callback=save_model(args.save_to),
                       start_epoch=start_epoch,
                       best_accumulated_miou=best_accumulated_miou)
