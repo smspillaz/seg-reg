@@ -191,7 +191,8 @@ class SpecifiedSegmentationImagesDataset(data.Dataset):
             "paths": {
                 "image": self.source_images[index],
                 "label": self.target_images[index]
-            }
+            },
+            "label_palette": target_image.getpalette()
         })
 
         return output
@@ -324,18 +325,21 @@ def calculate_mean_miou(output_batch, target_batch):
     return np.array(list(calculate_many_mious(output_batch, target_batch))).mean()
 
 
-def visualize_segmentation(segmented_image, num_classes=21):
+def visualize_segmentation(segmented_image, num_classes=21, palette=None):
     """Visualize segmentation."""
-    fig = hide_axis(sns.mpl.pyplot.imshow(segmented_image).get_figure())
+    img = Image.fromarray(segmented_image.astype('uint8', order='C'), mode='P')
+    if palette:
+        img.putpalette(palette)
+    fig = hide_axis(sns.mpl.pyplot.imshow(img).get_figure())
     return fig
 
 
-def save_segmentation(segmented_image, path, num_classes=21):
+def save_segmentation(segmented_image, path, num_classes=21, palette=None):
     """Save a segmentation somewhere."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    visualize_segmentation(segmented_image).savefig(path,
-                                                    bbox_inches="tight",
-                                                    pad_inches=0)
+    visualize_segmentation(segmented_image, palette=palette).savefig(path,
+                                                                     bbox_inches="tight",
+                                                                     pad_inches=0)
     sns.mpl.pyplot.clf()
 
 
@@ -353,12 +357,12 @@ def evaluation(model):
                 model.train()
 
 
-def segment_and_save(model, input, path):
+def segment_and_save(model, input, path, palette=None):
     """Segment a single image image and save it."""
     with evaluation(model):
         output = model(input.unsqueeze(0))
         pred = output.detach()[0].cpu().numpy().argmax(axis=0)
-        save_segmentation(pred, path)
+        save_segmentation(pred, path, palette=palette)
 
 
 def splice_into_path(path, splice):
@@ -386,11 +390,11 @@ def save_input_image(input, path):
     sns.mpl.pyplot.clf()
 
 
-def save_segmentations_for_image(model, input, label, path):
+def save_segmentations_for_image(model, input, label, path, palette=None):
     """Do segmentation for a few images and save the result to a PNG."""
     # First, save the input in path too
     save_input_image(input, splice_into_path(path, "input"))
-    save_segmentation(label.cpu().numpy(), splice_into_path(path, "label"))
+    save_segmentation(label.cpu().numpy(), splice_into_path(path, "label"), palette=palette)
 
     def _inner(statistics):
         """Use statistics to save the file."""
@@ -398,7 +402,7 @@ def save_segmentations_for_image(model, input, label, path):
             return
 
         epoch_path = splice_into_path(path, "epoch.{:02d}".format(statistics["epoch"]))
-        segment_and_save(model, input, epoch_path)
+        segment_and_save(model, input, epoch_path, palette=palette)
 
     return _inner
 
@@ -444,8 +448,13 @@ def save_interesting_images(path, device):
         for i, pair in enumerate(pairs):
             epoch_path = splice_into_path(path, ".".join([tag, str(i), "epoch{:02d}".format(epoch)]))
             save_input_image(pair["image"], splice_into_path(epoch_path, "input"))
-            save_segmentation(pair["label"], splice_into_path(epoch_path, "label"))
-            segment_and_save(model, pair["image"].to(device), splice_into_path(epoch_path, "segmentation"))
+            save_segmentation(pair["label"].cpu().numpy(),
+                              splice_into_path(epoch_path, "label"),
+                              palette=pair["label_palette"])
+            segment_and_save(model,
+                             pair["image"].to(device),
+                             splice_into_path(epoch_path, "segmentation"),
+                             palette=pair["label_palette"])
 
     def _inner(model, optimizer, val_loader, mious, epoch):
         ordered_mious = mious.argsort()
@@ -649,7 +658,8 @@ def main():
                                                              args.save_interesting_images,
                                                              "segmentations",
                                                              "image_{}.png".format(i)
-                                                         ))
+                                                         ),
+                                                         palette=val_loader_with_viewable_transforms[i]["label_palette"])
                             for i in range(0, 3)]
                       ),
                       epoch_end_callback=call_many(
