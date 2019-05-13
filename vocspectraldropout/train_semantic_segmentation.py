@@ -41,7 +41,7 @@ class DeepLabModel(nn.Module):
     def __init__(self, input_channels=3, num_classes=21, drop_rate=0.0):
         """Initialize parameters."""
         super().__init__()
-        self.feature_detection_layers = build_backbone(input_channels,drop_rate=drop_rate)
+        self.feature_detection_layers = build_backbone(input_channels, drop_rate=drop_rate)
         self.spatial_pyramid_pooling = SpatialPoolingPyramid(
             input_channels=2048,
             dilations=(6, 12, 18),
@@ -609,7 +609,7 @@ def main():
                               batch_size=args.batch_size)
     device = 'cuda' if args.cuda else 'cpu'
     model = DeepLabModel(input_channels=3,
-                         num_classes=args.num_classes, drop_rate = args.drop_rate).to(device)
+                         num_classes=args.num_classes, drop_rate=args.drop_rate).to(device)
     print(model)
     criterion = segmentation_cross_entropy_loss(size_average=None,
                                                 ignore_index=255,
