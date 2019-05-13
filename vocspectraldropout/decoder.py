@@ -30,7 +30,8 @@ class Decoder(nn.Module):
                  low_level_output_channels,
                  pyramid_input_channels,
                  pyramid_output_channels,
-                 num_classes):
+                 num_classes,
+                 use_channel_dropout=False):
         """Initialize the decoder."""
         super().__init__()
 
@@ -45,15 +46,15 @@ class Decoder(nn.Module):
                        stride=1,
                        padding=1,
                        bias=False),
-            # XXX: This is a potential place to apply channel dropout
-            nn.Dropout(0.5),
+            # TODO: Apply Channel Dropout if specified
+            (nn.Dropout2d if use_channel_dropout else nn.Dropout)(0.5),
             ConvBNReLU(pyramid_output_channels,
                        pyramid_output_channels,
                        kernel_size=3,
                        stride=1,
                        padding=1,
                        bias=False),
-            nn.Dropout(0.1),
+            (nn.Dropout2d if use_channel_dropout else nn.Dropout)(0.1),
             nn.Conv2d(pyramid_output_channels, num_classes, kernel_size=1, stride=1)
         )
 

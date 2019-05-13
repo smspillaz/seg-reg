@@ -38,20 +38,27 @@ from spatial_pyramid_pooling import SpatialPoolingPyramid
 class DeepLabModel(nn.Module):
     """DeepLabv3+ Model."""
 
-    def __init__(self, input_channels=3, num_classes=21, drop_rate=0.0):
+    def __init__(self,
+                 input_channels=3,
+                 num_classes=21,
+                 drop_rate=0.0,
+                 pyramid_use_channel_dropout=False,
+                 decoder_use_channel_dropout=False):
         """Initialize parameters."""
         super().__init__()
         self.feature_detection_layers = build_backbone(input_channels, drop_rate=drop_rate)
         self.spatial_pyramid_pooling = SpatialPoolingPyramid(
             input_channels=2048,
             dilations=(6, 12, 18),
-            output_pooling_channels=256
+            output_pooling_channels=256,
+            use_channel_dropout=pyramid_use_channel_dropout
         )
         self.decoder = Decoder(low_level_input_channels=256,
                                low_level_output_channels=48,
                                pyramid_input_channels=256,
                                pyramid_output_channels=256,
-                               num_classes=21)
+                               num_classes=21,
+                               use_channel_dropout=decoder_use_channel_dropout)
 
     def forward(self, input):
         x, low_level_features = self.feature_detection_layers(input)
@@ -589,7 +596,15 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=0.007, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
-    parser.add_argument("--drop-rate", type=float, default=0.0, help="Dropout2D rate")
+    parser.add_argument("--drop-rate", type=float, default=0.0, help="Feature Detection Dropout2D rate")
+    parser.add_argument("--decoder-use-channel-dropout",
+                        action='store_true',
+                        default=False,
+                        help="Use Dropout2D in Decoder layers.")
+    parser.add_argument("--pyramid-use-channel-dropout",
+                        action='store_true',
+                        default=False,
+                        help="Use Dropout2D in Pyramid Pooling layers.")
     parser.add_argument("--num-classes", type=int, default=21, help="Number of segmentation classes")
     parser.add_argument("--save-to", type=str, help="Where to save the model to", required=True)
     parser.add_argument("--log-statistics", type=str, help="Where to log statistics to", default="logs/statistics")
@@ -609,7 +624,10 @@ def main():
                               batch_size=args.batch_size)
     device = 'cuda' if args.cuda else 'cpu'
     model = DeepLabModel(input_channels=3,
-                         num_classes=args.num_classes, drop_rate=args.drop_rate).to(device)
+                         num_classes=args.num_classes,
+                         drop_rate=args.drop_rate,
+                         pyramid_use_channel_dropout=args.pyramid_use_channel_dropout,
+                         decoder_use_channel_dropout=args.decoder_use_channel_dropout).to(device)
     print(model)
     criterion = segmentation_cross_entropy_loss(size_average=None,
                                                 ignore_index=255,
