@@ -43,7 +43,8 @@ class DeepLabModel(nn.Module):
                  num_classes=21,
                  drop_rate=0.0,
                  pyramid_use_channel_dropout=False,
-                 decoder_use_channel_dropout=False):
+                 decoder_use_channel_dropout=False,
+                 decoder_use_channel_attention=False):
         """Initialize parameters."""
         super().__init__()
         self.feature_detection_layers = build_backbone(input_channels, drop_rate=drop_rate)
@@ -58,7 +59,8 @@ class DeepLabModel(nn.Module):
                                pyramid_input_channels=256,
                                pyramid_output_channels=256,
                                num_classes=21,
-                               use_channel_dropout=decoder_use_channel_dropout)
+                               use_channel_dropout=decoder_use_channel_dropout,
+                               use_channel_attention=decoder_use_channel_attention)
 
     def forward(self, input):
         x, low_level_features = self.feature_detection_layers(input)
@@ -601,6 +603,10 @@ def main():
                         action='store_true',
                         default=False,
                         help="Use Dropout2D in Decoder layers.")
+    parser.add_argument("--decoder-use-channel-attention",
+                        action='store_true',
+                        default=False,
+                        help="Use ChannelAttention in Decoder layers.")
     parser.add_argument("--pyramid-use-channel-dropout",
                         action='store_true',
                         default=False,
@@ -627,7 +633,8 @@ def main():
                          num_classes=args.num_classes,
                          drop_rate=args.drop_rate,
                          pyramid_use_channel_dropout=args.pyramid_use_channel_dropout,
-                         decoder_use_channel_dropout=args.decoder_use_channel_dropout).to(device)
+                         decoder_use_channel_dropout=args.decoder_use_channel_dropout,
+                         decoder_use_channel_attention=args.decoder_use_channel_attention).to(device)
     print(model)
     criterion = segmentation_cross_entropy_loss(size_average=None,
                                                 ignore_index=255,
