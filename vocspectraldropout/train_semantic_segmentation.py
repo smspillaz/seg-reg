@@ -651,7 +651,7 @@ def main():
 
     if args.load_from:
         saved_info = torch.load(args.load_from)
-        start_epoch = saved_info['epoch'],
+        start_epoch = saved_info['epoch']
         best_accumulated_miou = saved_info['best_pred']
         optimizer.load_state_dict(saved_info['optimizer'])
         model.load_state_dict(saved_info['state_dict'])
