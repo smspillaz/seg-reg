@@ -285,10 +285,10 @@ def save_model(path):
     return _inner
 
 
-def log_statistics(path, append=False):
+def log_statistics(path):
     """Log the statistics to path."""
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    stream = open(path, "w+" if append else "w")
+    stream = open(path, "a+")
 
     def _inner(statistics):
         stream.write(json.dumps(statistics) + "\n")
@@ -673,8 +673,7 @@ def main():
                       device,
                       epochs=args.epochs,
                       statistics_callback=call_many(
-                          log_statistics(args.log_statistics,
-                                         args.load_from is not None),
+                          log_statistics(args.log_statistics),
                           # Take the first image from the first three batches
                           *[save_segmentations_for_image(model,
                                                          val_loader_with_viewable_transforms[i]["image"].to(device),
