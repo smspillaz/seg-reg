@@ -215,7 +215,10 @@ class SpecifiedSegmentationImagesDataset(data.Dataset):
             self.source_images_path,
             self.target_images_path,
             transforms.Compose([
-                t for t in self.transforms.transforms if not isinstance(t, Normalize)
+                t for t in self.transforms.transforms if not any([
+                    isinstance(t, cls)
+                    for cls in (Normalize, RandomScaleCrop, RandomGaussianBlur, RandomHorizontalFlip)
+                ])
             ])
         )
 
