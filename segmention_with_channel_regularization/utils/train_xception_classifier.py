@@ -23,8 +23,6 @@ from xception import (
     Xception
 )
 
-from other.xception import AlignedXception
-
 
 IMAGE_NORMALIZATION_WEIGHTS = ((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))
 
@@ -128,7 +126,6 @@ class XceptionClassifier(nn.Module):
 
     def __init__(self, in_channels, out_channels, classes, layers, initialization):
         super().__init__()
-        #self.xception = AlignedXception(16, nn.BatchNorm2d, pretrained=False)
         self.xception = Xception(in_channels, layers, out_channels, initialization=initialization)
         self.classifier = FeatureMapClassifier(out_channels, classes)
 
