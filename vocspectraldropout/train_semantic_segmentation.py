@@ -34,6 +34,8 @@ from resnet import build_backbone
 from decoder import Decoder
 from spatial_pyramid_pooling import SpatialPoolingPyramid
 
+sns.mpl.use('Agg')
+
 
 class DeepLabModel(nn.Module):
     """DeepLabv3+ Model."""
