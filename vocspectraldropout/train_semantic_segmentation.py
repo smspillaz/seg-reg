@@ -371,13 +371,16 @@ def evaluation(model):
                 model.train()
 
 
-def segment_and_save(model, input, path, palette=None):
+def segment_and_save(model, input, target, image_path, log_path, epoch, palette=None):
     """Segment a single image image and save it."""
     with evaluation(model):
         output = model(input.unsqueeze(0))
         pred = output.detach()[0].cpu().numpy().argmax(axis=0)
-        save_segmentation(pred, path, palette=palette)
+        miou = calculate_miou(output.detach()[0], target)
+        save_segmentation(pred, image_path, palette=palette)
 
+        with open(log_path, "a+") as miou_log:
+            miou_log.write("{} {}\n".format(epoch, miou))
 
 def splice_into_path(path, splice):
     """Splice something into path, before the extension."""
@@ -416,7 +419,8 @@ def save_segmentations_for_image(model, input, label, path, palette=None):
             return
 
         epoch_path = splice_into_path(path, "epoch.{:02d}".format(statistics["epoch"]))
-        segment_and_save(model, input, epoch_path, palette=palette)
+        log_path = "{}.log.txt".format(path)
+        segment_and_save(model, input, label, epoch_path, log_path, statistics["epoch"], palette=palette)
 
     return _inner
 
@@ -467,7 +471,10 @@ def save_interesting_images(path, device):
                               palette=pair["label_palette"])
             segment_and_save(model,
                              pair["image"].to(device),
+                             pair["label"].cpu(),
                              splice_into_path(epoch_path, "segmentation"),
+                             splice_into_path(path, ".".join([tag, str(i)])) + ".log.txt",
+                             epoch,
                              palette=pair["label_palette"])
 
     def _inner(model, optimizer, val_loader, mious, epoch):
