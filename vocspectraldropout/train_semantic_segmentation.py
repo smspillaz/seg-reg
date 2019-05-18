@@ -599,6 +599,24 @@ def call_many(*functions):
     return _inner
 
 
+def save_segmentations_for_first_n_images(model, dataset, path, n, device):
+    """Create functions to save segmentations for the first n images."""
+    def functor_for_image(i):
+        pair = dataset_with_viewable_transforms[i]
+        image = pair["image"].to(device)
+        label = pair["label"].to(device)
+        palette = pair["label_palette"]
+
+        return save_segmentations_for_image(model,
+                                            image,
+                                            label,
+                                            os.path.join(path, "image_{}.png".format(i)),
+                                            palette=palette)
+
+    dataset_with_viewable_transforms = dataset.with_viewable_transforms()
+    return [functor_for_image(i) for i in range(0, n)]
+
+
 def main():
     """Entry point."""
     parser = argparse.ArgumentParser("Train semantic segmentation model.")
@@ -675,7 +693,6 @@ def main():
                                                 len(train_loader))
 
     if not args.test_only:
-        val_loader_with_viewable_transforms = val_loader.dataset.with_viewable_transforms()
         training_loop(model,
                       train_loader,
                       val_loader,
@@ -687,16 +704,23 @@ def main():
                       statistics_callback=call_many(
                           log_statistics(args.log_statistics),
                           # Take the first image from the first three batches
-                          *[save_segmentations_for_image(model,
-                                                         val_loader_with_viewable_transforms[i]["image"].to(device),
-                                                         val_loader_with_viewable_transforms[i]["label"].to(device),
-                                                         os.path.join(
-                                                             args.save_interesting_images,
-                                                             "segmentations",
-                                                             "image_{}.png".format(i)
-                                                         ),
-                                                         palette=val_loader_with_viewable_transforms[i]["label_palette"])
-                            for i in range(0, 3)]
+                          *(save_segmentations_for_first_n_images(model,
+                                                                  val_loader.dataset,
+                                                                  os.path.join(
+                                                                      args.save_interesting_images,
+                                                                      "segmentations"
+                                                                  ),
+                                                                  3,
+                                                                  device) +
+                            save_segmentations_for_first_n_images(model,
+                                                                  train_loader.dataset,
+                                                                  os.path.join(
+                                                                      args.save_interesting_images,
+                                                                      "segmentations",
+                                                                      "train"
+                                                                  ),
+                                                                  3,
+                                                                  device))
                       ),
                       epoch_end_callback=call_many(
                           save_model_on_better_miou(args.save_to,
