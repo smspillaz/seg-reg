@@ -40,7 +40,7 @@ class Block(nn.Module):
                                 bias=False)),
             ("bn2", nn.BatchNorm2d(out_channels)),
             ("relu2", nn.ReLU(inplace=False)),
-            #TODO: Added a channel dropout layer here
+            # ChannelDropout after feature detection on bottlenecked channels
             ("dropout2",nn.Dropout2d(p=drop_rate)),
             # 1x1 Convlution to increase the number of planes
             ("conv3", nn.Conv2d(out_channels,
