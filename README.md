@@ -32,3 +32,15 @@ We noticed that the original DeepLabv3+ [paper](https://arxiv.org/abs/1802.02611
 |Decoder ChannelAttention    | 0.01       | 0.86       |0.18      | 0.36     |
 |Decoder ChannelAttention and Dropout2D    | 0.01       | 0.18       |0.03      | 0.43     |
 |All    | 0.02       | 0.71       |0.22      | 0.39     |
+
+## Training
+
+To train the network, first get the VOC2012 [devkit](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCdevkit_18-May-2011.tar) and [training/validation data](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar) and untar it to `data`. You can then use `segmentation_with_channel_regularization/train_voc.sh` and set `EXPERIMENT` in the environment to ensure that results end up in `experiments/$EXPERIMENT`. Additional arguments for the `segmentation_with_channel_regularization/train_spectral_dropout.py` file can be passed directly to `train_voc.sh`. All the paths have been wired up to assume that the data is in `segmentation_with_channel_regularization/../data`, but you can change it using the `--source-images`, `--segmentation-images`, `--training-set` and `--validation-set` options.
+
+In order to limit the size of the training/validation data, just edit `data/VOCdevkit/VOC2012/ImageSets/train.txt` and delete lines referring to images that you want to exclude from the training set.
+
+These arguments have the following effects:
+ - `--decoder-use-channel-dropout`: Use ChannelDropout in the decoder instead of regular dropout
+ - `--decoder-use-channel-attention`: Use ChannelAttention layer in the decoder
+ - `--pyramid-use-channel-dropout`: Use ChannelDropout in the pooling pyramid instead of regular dropout
+ - `--drop-rate=`: Specify ChannelDropout rate to use in ResNet layers (default=0.0)
