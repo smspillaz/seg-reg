@@ -763,14 +763,11 @@ def main():
                               args.training_set,
                               args.validation_set,
                               args.test_set,
-                              batch_size=args.batch_size)
-    device = 'cuda' if args.cuda else 'cpu'
-    model = DeepLabModel(input_channels=3,
-                         num_classes=args.num_classes,
-                         drop_rate=args.drop_rate,
-                         pyramid_use_channel_dropout=args.pyramid_use_channel_dropout,
-                         decoder_use_channel_dropout=args.decoder_use_channel_dropout,
-                         decoder_use_channel_attention=args.decoder_use_channel_attention).to(device)
+                              batch_size=args.batch_size,
+                              limit_data=args.limit_data)
+    device = torch.device('cuda:0') if args.cuda else torch.device('cpu')
+    model = create_model(input_channels=3, args=args).to(device)
+
     print(model)
     criterion = segmentation_cross_entropy_loss(size_average=None,
                                                 ignore_index=255,
