@@ -266,6 +266,15 @@ class SpecifiedSegmentationImagesDataset(data.Dataset):
         )
 
 
+def list_proportion(source_list, proportion, batch_size):
+    """Get a proportion of the list."""
+    bound = int(len(source_list) * proportion)
+    bound += bound % batch_size
+    bound = min(bound, len(source_list))
+
+    return source_list[:bound]
+
+
 def load_data(source_images,
               segmentation_images,
               training_set,
@@ -273,7 +282,8 @@ def load_data(source_images,
               test_set,
               base_size=513,
               crop_size=513,
-              batch_size=8):
+              batch_size=8,
+              limit_data=1.0):
     """Create DataLoader objects for each of the three image sets.
 
     :source_images: are, as the name suggests, the source images.
@@ -292,11 +302,15 @@ def load_data(source_images,
         ToTensor()
     ])
 
-    train_dataset = SpecifiedSegmentationImagesDataset(images_list=read_list(training_set),
+    train_dataset = SpecifiedSegmentationImagesDataset(images_list=list_proportion(read_list(training_set),
+                                                                                   limit_data,
+                                                                                   batch_size),
                                                        source_images_path=source_images,
                                                        target_images_path=segmentation_images,
                                                        transforms=training_transforms)
-    validation_dataset = SpecifiedSegmentationImagesDataset(images_list=read_list(validation_set),
+    validation_dataset = SpecifiedSegmentationImagesDataset(images_list=list_proportion(read_list(validation_set),
+                                                                                        limit_data,
+                                                                                        batch_size),
                                                             source_images_path=source_images,
                                                             target_images_path=segmentation_images,
                                                             transforms=validation_transforms)
