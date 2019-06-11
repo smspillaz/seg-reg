@@ -77,6 +77,34 @@ class DeepLabModel(nn.Module):
         return x
 
 
+    def optimizer_params(self):
+        """Get params and learning rates for optimizer."""
+        return [
+            ((self.feature_detection_layers, ), 1),
+            ((self.spatial_pyramid_pooling, self.decoder, ), 10)
+        ]
+
+
+class DeepLabModelZooModel(nn.Module):
+    def __init__(self, backbone, classifier):
+        super().__init__()
+        self.feature_detection_layers = backbone
+        self.decoder = classifier
+
+    def forward(self, x):
+        input_size = x.shape[-2:]
+        x = self.feature_detection_layers(x)['out']
+        x = self.decoder(x)
+        return F.interpolate(x, size=input_size, mode='bilinear', align_corners=False)
+
+    def optimizer_params(self):
+        """Get params and learning rates for optimizer."""
+        return [
+            ((self.feature_detection_layers, ), 1),
+            ((self.decoder, ), 10)
+        ]
+
+
 def segmentation_cross_entropy_loss(size_average,
                                     ignore_index,
                                     device):
@@ -656,6 +684,23 @@ def save_segmentations_for_first_n_images(model, dataset, path, n, device):
     return [functor_for_image(i) for i in range(0, n)]
 
 
+def create_model(input_channels, args):
+    """Create model from the arguments."""
+    if args.model == "deeplabv3":
+        model = DeepLabModel(input_channels=3,
+                             num_classes=args.num_classes,
+                             drop_rate=args.drop_rate,
+                             pyramid_use_channel_dropout=args.pyramid_use_channel_dropout,
+                             decoder_use_channel_dropout=args.decoder_use_channel_dropout,
+                             decoder_use_channel_attention=args.decoder_use_channel_attention)
+    elif args.model == "modelzoo-deeplabv3":
+        zoo_model = torch.hub.load('pytorch/vision', 'deeplabv3_resnet101', pretrained=True)
+        model = DeepLabModelZooModel(zoo_model.backbone, zoo_model.classifier)
+        del zoo_model
+
+    return model
+
+
 def main():
     """Entry point."""
     parser = argparse.ArgumentParser("Train semantic segmentation model.")
@@ -687,6 +732,12 @@ def main():
     parser.add_argument("--test-only", action="store_true", help="Only test")
     parser.add_argument("--load-from", type=str, help="Where to load the model from")
     parser.add_argument("--save-interesting-images", type=str, help="Where to save interesting images", default="logs")
+    parser.add_argument("--model",
+                        type=str,
+                        help="Which model to create",
+                        default="deeplabv3",
+                        choices=["deeplabv3", "modelzoo-deeplabv3"])
+    parser.add_argument("--limit-data", type=float, default=1.0, help="Percentage of data to use")
     args = parser.parse_args()
 
     (train_loader,
@@ -708,10 +759,9 @@ def main():
     criterion = segmentation_cross_entropy_loss(size_average=None,
                                                 ignore_index=255,
                                                 device=device)
-    optimizer = optim.SGD(differential_learning_rates(model, [
-                              ((model.feature_detection_layers, ), 1),
-                              ((model.spatial_pyramid_pooling, model.decoder), 10)
-                          ], args.learning_rate),
+    optimizer = optim.SGD(differential_learning_rates(model,
+                                                      model.optimizer_params(),
+                                                      args.learning_rate),
                           momentum=0.9,
                           weight_decay=5e-4,
                           nesterov=False)
