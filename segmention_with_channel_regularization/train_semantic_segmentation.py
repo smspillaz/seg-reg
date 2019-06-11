@@ -655,12 +655,14 @@ def training_loop(model,
         accumulated_loss, accumulated_miou, mious = validate(model,
                                                              val_loader,
                                                              criterion,
+                                                             device,
                                                              epoch,
                                                              statistics_callback)
 
-        tqdm.tqdm.write("Epoch {}, Validation loss: {}, Validation mIoU: {}".format(epoch,
-                                                                                    accumulated_loss / len(val_loader),
-                                                                                    accumulated_miou / len(val_loader)))
+        tqdm.tqdm.write("{}: Epoch {}, Validation loss: {}, Validation mIoU: {}".format(os.environ.get("EXPERIMENT", "segmentation"),
+                                                                                        epoch,
+                                                                                        accumulated_loss / len(val_loader),
+                                                                                        accumulated_miou / len(val_loader)))
 
 
         # Now that we have all mious, we can find the indices of "interesting" ones (eg, ones
