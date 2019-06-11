@@ -422,10 +422,10 @@ def save_input_image(input, path):
     sns.mpl.pyplot.clf()
 
 
-def save_segmentations_for_image(model, input, label, path, palette=None):
+def save_segmentations_for_image(model, viewable_input, input, label, path, palette=None):
     """Do segmentation for a few images and save the result to a PNG."""
     # First, save the input in path too
-    save_input_image(input, splice_into_path(path, "input"))
+    save_input_image(viewable_input, splice_into_path(path, "input"))
     save_segmentation(label.cpu().numpy(), splice_into_path(path, "label"), palette=palette)
 
     def _inner(statistics):
@@ -479,18 +479,19 @@ def save_interesting_images(path, device):
     def save_pairs(model, pairs, epoch, tag):
         """Helper to save pairs of images."""
         for i, pair in enumerate(pairs):
+            network_input, viewable = pair
             epoch_path = splice_into_path(path, ".".join([tag, str(i), "epoch{:02d}".format(epoch)]))
-            save_input_image(pair["image"], splice_into_path(epoch_path, "input"))
-            save_segmentation(pair["label"].cpu().numpy(),
+            save_input_image(viewable["image"], splice_into_path(epoch_path, "input"))
+            save_segmentation(viewable["label"].cpu().numpy(),
                               splice_into_path(epoch_path, "label"),
-                              palette=pair["label_palette"])
+                              palette=viewable["label_palette"])
             segment_and_save(model,
-                             pair["image"].to(device),
-                             pair["label"].cpu(),
+                             network_input["image"].to(device),
+                             network_input["label"].cpu(),
                              splice_into_path(epoch_path, "segmentation"),
                              splice_into_path(path, ".".join([tag, str(i)])) + ".log.txt",
                              epoch,
-                             palette=pair["label_palette"])
+                             palette=network_input["label_palette"])
 
     def _inner(model, optimizer, val_loader, mious, epoch):
         ordered_mious = mious.argsort()
@@ -498,9 +499,9 @@ def save_interesting_images(path, device):
 
         length = len(ordered_mious)
         middle = (length - 1) // 2
-        worst_three = [viewable_val_loader[i] for i in ordered_mious[:3]]
-        best_three = [viewable_val_loader[i] for i in ordered_mious[-3:]]
-        middle_three = [viewable_val_loader[i] for i in ordered_mious[middle - 1:middle + 1]]
+        worst_three = [(val_loader.dataset[i], viewable_val_loader[i]) for i in ordered_mious[:3]]
+        best_three = [(val_loader.dataset[i], viewable_val_loader[i]) for i in ordered_mious[-3:]]
+        middle_three = [(val_loader.dataset[i], viewable_val_loader[i]) for i in ordered_mious[middle - 1:middle + 1]]
 
         # Now that we have the worst, best and middle images,
         # save them
@@ -636,17 +637,21 @@ def call_many(*functions):
 def save_segmentations_for_first_n_images(model, dataset, path, n, device):
     """Create functions to save segmentations for the first n images."""
     def functor_for_image(i):
-        pair = dataset_with_viewable_transforms[i]
-        image = pair["image"].to(device)
-        label = pair["label"].to(device)
-        palette = pair["label_palette"]
+        input_pair = dataset_with_deterministic_transforms[i]
+        viewable_pair = dataset_with_viewable_transforms[i]
+        image = input_pair["image"].to(device)
+        viewable_image = viewable_pair["image"].to(device)
+        viewable_label = viewable_pair["label"].to(device)
+        palette = viewable_pair["label_palette"]
 
         return save_segmentations_for_image(model,
+                                            viewable_image,
                                             image,
-                                            label,
+                                            viewable_label,
                                             os.path.join(path, "image_{}.png".format(i)),
                                             palette=palette)
 
+    dataset_with_deterministic_transforms = dataset.with_deterministic_transforms()
     dataset_with_viewable_transforms = dataset.with_viewable_transforms()
     return [functor_for_image(i) for i in range(0, n)]
 
