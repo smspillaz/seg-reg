@@ -511,6 +511,54 @@ def save_interesting_images(path, device):
     return _inner
 
 
+def validate(model,
+             val_loader,
+             criterion,
+             device,
+             epoch,
+             statistics_callback=None):
+    """Validate the model."""
+    statistics_callback = statistics_callback or (lambda x: None)
+
+    with torch.no_grad():
+        model.eval()
+        progress = tqdm.tqdm(val_loader, desc="Validation Batch")
+
+        accumulated_loss = 0
+        accumulated_miou = 0
+
+        mious = []
+
+        for batch_index, batch in enumerate(progress):
+            source_batch = batch['image'].to(device)
+            target_batch = batch['label'].to(device)
+
+            output_batch = model(source_batch)
+            loss = criterion(output_batch, target_batch)
+            batch_mious = list(calculate_many_mious(output_batch, target_batch))
+            miou = np.array(batch_mious).mean()
+            # Update progress bar
+            progress.set_postfix({
+                'loss': loss.item(),
+                'miou': miou
+            })
+            statistics_callback({
+                'epoch': epoch,
+                'mode': 'validation',
+                'batch_index': batch_index,
+                'statistics': {
+                    'loss': loss.item(),
+                    'mIoU': miou
+                }
+            })
+
+            accumulated_loss += loss.item()
+            accumulated_miou += miou
+            mious += batch_mious
+
+    return accumulated_loss, accumulated_miou, mious
+
+
 def training_loop(model,
                   train_loader,
                   val_loader,
@@ -561,50 +609,21 @@ def training_loop(model,
             loss.backward()
             optimizer.step()
 
-        with torch.no_grad():
-            model.eval()
-            progress = tqdm.tqdm(val_loader, desc="Validation Batch")
+        accumulated_loss, accumulated_miou, mious = validate(model,
+                                                             val_loader,
+                                                             criterion,
+                                                             epoch,
+                                                             statistics_callback)
 
-            accumulated_loss = 0
-            accumulated_miou = 0
-
-            mious = []
-
-            for batch_index, batch in enumerate(progress):
-                source_batch = batch['image'].to(device)
-                target_batch = batch['label'].to(device)
-
-                output_batch = model(source_batch)
-                loss = criterion(output_batch, target_batch)
-                batch_mious = list(calculate_many_mious(output_batch, target_batch))
-                miou = np.array(batch_mious).mean()
-                # Update progress bar
-                progress.set_postfix({
-                    'loss': loss.item(),
-                    'miou': miou
-                })
-                statistics_callback({
-                    'epoch': epoch,
-                    'mode': 'validation',
-                    'batch_index': batch_index,
-                    'statistics': {
-                        'loss': loss.item(),
-                        'mIoU': miou
-                    }
-                })
-
-                accumulated_loss += loss.item()
-                accumulated_miou += miou
-                mious += batch_mious
-
-            tqdm.tqdm.write("Epoch {}, Validation loss: {}, Validation mIoU: {}".format(epoch,
-                                                                                        accumulated_loss / len(val_loader),
-                                                                                        accumulated_miou / len(val_loader)))
+        tqdm.tqdm.write("Epoch {}, Validation loss: {}, Validation mIoU: {}".format(epoch,
+                                                                                    accumulated_loss / len(val_loader),
+                                                                                    accumulated_miou / len(val_loader)))
 
 
-            # Now that we have all mious, we can find the indices of "interesting" ones (eg, ones
-            # that did well, ones that did badly...
-            epoch_end_callback(model, optimizer, val_loader, np.array(mious), epoch)
+        # Now that we have all mious, we can find the indices of "interesting" ones (eg, ones
+        # that did well, ones that did badly...
+        epoch_end_callback(model, optimizer, val_loader, np.array(mious), epoch)
+
 
 
 def call_many(*functions):
