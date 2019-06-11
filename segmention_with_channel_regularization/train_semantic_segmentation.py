@@ -575,7 +575,7 @@ def training_loop(model,
     epoch_end_callback = epoch_end_callback or (lambda x: None)
     statistics_callback = statistics_callback or (lambda x: None)
 
-    for epoch in tqdm.tqdm(range(start_epoch, epochs + start_epoch), desc="Epoch"):
+    for epoch in tqdm.tqdm(range(start_epoch, epochs), desc="Epoch"):
         model.train()
 
         progress = tqdm.tqdm(train_loader, desc="Train Batch")
