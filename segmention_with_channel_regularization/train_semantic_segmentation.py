@@ -390,7 +390,7 @@ def segment_and_save(model, input, target, image_path, log_path, epoch, palette=
     """Segment a single image image and save it."""
     with evaluation(model):
         output = model(input.unsqueeze(0))
-        pred = output.detach()[0].cpu().numpy().argmax(axis=0)
+        pred = torch.argmax(output.detach()[0], dim=0).cpu().byte().numpy()
         miou = calculate_miou(output.detach()[0], target)
         save_segmentation(pred, image_path, palette=palette)
 
