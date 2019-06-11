@@ -208,6 +208,21 @@ class SpecifiedSegmentationImagesDataset(data.Dataset):
 
         return output
 
+    def with_deterministic_transforms(self):
+        """Loader with transforms that are always the same."""
+        return SpecifiedSegmentationImagesDataset(
+            self.images_list,
+            self.source_images_path,
+            self.target_images_path,
+            transforms.Compose([
+                t for t in self.transforms.transforms if not any([
+                    isinstance(t, cls)
+                    for cls in (RandomScaleCrop, RandomGaussianBlur, RandomHorizontalFlip)
+                ])
+            ])
+        )
+
+
     def with_viewable_transforms(self):
         """Loader with transforms that are still human-viewable."""
         return SpecifiedSegmentationImagesDataset(
