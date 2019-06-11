@@ -836,7 +836,7 @@ def main():
 
     tqdm.tqdm.write("Performing final validation set pass")
     accumulated_loss, accumulated_miou, mious = validate(model,
-                                                         val_loader,
+                                                         test_loader,
                                                          criterion,
                                                          device,
                                                          args.epochs,
@@ -865,7 +865,7 @@ def main():
     save_interesting_images(os.path.join(args.save_interesting_images,
                                          "interesting",
                                          "image.png"),
-                            device)(model, optimizer, val_loader, np.array(mious), args.epochs)
+                            device)(model, optimizer, test_loader, np.array(mious), args.epochs)
 
 
 if __name__ == "__main__":
