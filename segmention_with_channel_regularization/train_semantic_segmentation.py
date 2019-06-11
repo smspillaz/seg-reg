@@ -766,5 +766,39 @@ def main():
                       ),
                       start_epoch=start_epoch)
 
+    tqdm.tqdm.write("Performing final validation set pass")
+    accumulated_loss, accumulated_miou, mious = validate(model,
+                                                         val_loader,
+                                                         criterion,
+                                                         device,
+                                                         args.epochs,
+                                                         statistics_callback=call_many(
+                          log_statistics(args.log_statistics),
+                          # Take the first image from the first three batches
+                          *(save_segmentations_for_first_n_images(model,
+                                                                  val_loader.dataset,
+                                                                  os.path.join(
+                                                                      args.save_interesting_images,
+                                                                      "segmentations"
+                                                                  ),
+                                                                  3,
+                                                                  device) +
+                            save_segmentations_for_first_n_images(model,
+                                                                  train_loader.dataset,
+                                                                  os.path.join(
+                                                                      args.save_interesting_images,
+                                                                      "segmentations",
+                                                                      "train"
+                                                                  ),
+                                                                  3,
+                                                                  device))
+                      ))
+
+    save_interesting_images(os.path.join(args.save_interesting_images,
+                                         "interesting",
+                                         "image.png"),
+                            device)(model, optimizer, val_loader, np.array(mious), args.epochs)
+
+
 if __name__ == "__main__":
     main()
