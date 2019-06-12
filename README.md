@@ -33,6 +33,22 @@ We noticed that the original DeepLabv3+ [paper](https://arxiv.org/abs/1802.02611
 |Decoder ChannelAttention and Dropout2D    | 0.01       | 0.18       |0.03      | 0.43     |
 |All    | 0.02       | 0.71       |0.22      | 0.39     |
 
+### Sample images
+
+#### Baseline
+
+![Baseline Segmentations](reports/overfitted/none/best_images.png)
+
+#### Pyramid Channel Dropout
+
+![Baseline Segmentations](reports/overfitted/pyramid-channel-dropout/best_images.png)
+
+#### Pretrained model after fine-tuning on sample images
+
+![Baseline Segmentations](reports/overfitted/pretrained-modelzoo/best_images.png)
+
+#### Pyramid Pooling Dropout2D
+
 ## Training
 
 To train the network, first get the VOC2012 [devkit](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCdevkit_18-May-2011.tar) and [training/validation data](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/VOCtrainval_11-May-2012.tar) and untar it to `data`. You can then use `segmentation_with_channel_regularization/train_voc.sh` and set `EXPERIMENT` in the environment to ensure that results end up in `experiments/$EXPERIMENT`. Additional arguments for the `segmentation_with_channel_regularization/train_spectral_dropout.py` file can be passed directly to `train_voc.sh`. All the paths have been wired up to assume that the data is in `segmentation_with_channel_regularization/../data`, but you can change it using the `--source-images`, `--segmentation-images`, `--training-set` and `--validation-set` options.
