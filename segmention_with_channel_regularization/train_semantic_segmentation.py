@@ -793,8 +793,10 @@ def segment_and_produce_tensorboard_image(model, image, label, palette=None):
     return segmentation_image, miou
 
 
-def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, device):
+def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, device, set_name=None):
     """Create functions to save segmentations for the first n images."""
+    set_name = set_name or "validation"
+
     def on_received_image(i,
                           image,
                           viewable_image,
@@ -815,11 +817,11 @@ def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, devic
             # Blend segmentation on top of real image
             overlay_segmentation_image = overlay_segmentation(tensor_image, segmentation_image)
 
-            summary_writer.add_images("validation/reference/{}".format(i), np.hstack([
+            summary_writer.add_images("{}/reference/{}".format(set_name, i), np.hstack([
                 np.asarray(overlay_label_image.convert('RGB')),
                 np.asarray(overlay_segmentation_image.convert('RGB'))
             ]), global_step=statistics["epoch"], dataformats='HWC')
-            summary_writer.add_scalar("validation/reference/{}/mIoU".format(i),
+            summary_writer.add_scalar("{}/reference/{}/mIoU".format(set_name, i),
                                       miou,
                                       global_step=statistics["epoch"])
 
