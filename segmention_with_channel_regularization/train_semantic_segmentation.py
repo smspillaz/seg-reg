@@ -396,11 +396,21 @@ def calculate_mean_miou(output_batch, target_batch):
     return np.array(list(calculate_many_mious(output_batch, target_batch))).mean()
 
 
+def segmentation_to_image(segmented_image, num_classes=21, palette=None):
+    """Create an image with the segmentation result."""
+    img = Image.fromarray(segmented_image.astype('uint8', order='C'), mode='P')
+
+    palette = torch.tensor([2 ** 25 - 1, 2 ** 15 - 1, 2 ** 21 - 1])
+    colors = torch.as_tensor([i for i in range(21)])[:, None] * palette
+    colors = (colors % 255).numpy().astype("uint8")
+
+    img.putpalette(colors)
+    return img
+
+
 def visualize_segmentation(segmented_image, num_classes=21, palette=None):
     """Visualize segmentation."""
-    img = Image.fromarray(segmented_image.astype('uint8', order='C'), mode='P')
-    if palette:
-        img.putpalette(palette)
+    img = segmentation_to_image(segmented_image, num_classes=21, palette=palette)
     fig = hide_axis(sns.mpl.pyplot.imshow(img).get_figure())
     return fig
 
