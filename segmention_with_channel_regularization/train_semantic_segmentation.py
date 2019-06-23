@@ -783,6 +783,16 @@ def viewable_image_label_pair_to_images(viewable_image, viewable_label, palette=
     return label_image, tensor_image
 
 
+def segment_and_produce_tensorboard_image(model, image, label, palette=None):
+    """Segment image and produce a tensorboard-loggable image and miou."""
+    pred, output_tensor = segment_image(model, image)
+    miou = calculate_miou(output_tensor.detach(), label)
+    segmentation_image = segmentation_to_image(pred,
+                                               palette=palette)
+
+    return segmentation_image, miou
+
+
 def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, device):
     """Create functions to save segmentations for the first n images."""
     def on_received_image(i,
@@ -797,10 +807,10 @@ def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, devic
             if statistics["mode"] != "validation" or statistics["batch_index"] != 0:
                 return
 
-            pred, output_tensor = segment_image(model, image)
-            miou = calculate_miou(output_tensor.detach(), viewable_label)
-            segmentation_image = segmentation_to_image(pred,
-                                                       palette=palette)
+            segmentation_image, miou = segment_and_produce_tensorboard_image(model,
+                                                                             image,
+                                                                             viewable_label,
+                                                                             palette=palette)
 
             # Blend segmentation on top of real image
             overlay_segmentation_image = overlay_segmentation(tensor_image, segmentation_image)
@@ -853,10 +863,10 @@ def save_interesting_images_to_tensorboard(summary_writer,
             # and label on top of the original image
             overlay_label_image = overlay_segmentation(tensor_image, label_image)
 
-            pred, output_tensor = segment_image(model, network_input["image"].to(device))
-            miou = calculate_miou(output_tensor.detach(), viewable_label)
-            segmentation_image = segmentation_to_image(pred,
-                                                       palette=palette)
+            segmentation_image, miou = segment_and_produce_tensorboard_image(model,
+                                                                             network_input["image"],
+                                                                             viewable_label,
+                                                                             palette=palette)
 
             # Blend segmentation on top of real image
             overlay_segmentation_image = overlay_segmentation(tensor_image, segmentation_image)
