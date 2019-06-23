@@ -19,6 +19,8 @@ from contextlib import contextmanager
 
 from torch.utils.data import DataLoader
 
+from torch.utils.tensorboard import SummaryWriter
+
 from deeplab_custom_transforms import (
     FixScaleCrop,
     Normalize,
@@ -841,6 +843,7 @@ def main():
                                                 args.learning_rate,
                                                 start_epoch + args.epochs,
                                                 len(train_loader))
+    writer = SummaryWriter(os.path.join(os.path.dirname(args.log_statistics), "tensorboard"))
 
     if not args.test_only:
         training_loop(model,
