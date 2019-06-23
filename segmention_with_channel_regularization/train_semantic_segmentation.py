@@ -809,8 +809,8 @@ def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, devic
             if statistics["mode"] != "validation" or statistics["batch_index"] != 0:
                 return
 
-            segmentation_image, miou = segment_and_produce_tensorboard_image(model,
-                                                                             image,
+            segmentation_image, miou = segment_and_produce_tensorboard_image(model.to(device),
+                                                                             image.to(device),
                                                                              viewable_label,
                                                                              palette=palette)
 
@@ -866,8 +866,8 @@ def save_interesting_images_to_tensorboard(summary_writer,
             overlay_label_image = overlay_segmentation(tensor_image, label_image)
 
             segmentation_image, miou = segment_and_produce_tensorboard_image(model,
-                                                                             network_input["image"],
-                                                                             viewable_label,
+                                                                             network_input["image"].to(device),
+                                                                             viewable_label.to(device),
                                                                              palette=palette)
 
             # Blend segmentation on top of real image
