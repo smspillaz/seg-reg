@@ -774,6 +774,15 @@ def overlay_segmentation(image, segmentation_image, blend_alpha=0.3):
                        alpha=blend_alpha)
 
 
+def viewable_image_label_pair_to_images(viewable_image, viewable_label, palette=None):
+    """Convert the viewable_image and viewable_label pair into actual Image instances."""
+    label_image = segmentation_to_image(viewable_label.cpu().numpy(),
+                                        palette=palette)
+    tensor_image = Image.fromarray(viewable_image.cpu().numpy().transpose(1, 2, 0).astype('uint8'))
+
+    return label_image, tensor_image
+
+
 def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, device):
     """Create functions to save segmentations for the first n images."""
     def on_received_image(i,
@@ -804,9 +813,8 @@ def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, devic
                                       miou,
                                       global_step=statistics["epoch"])
 
-        label_image = segmentation_to_image(viewable_label.cpu().numpy(),
-                                            palette=palette)
-        tensor_image = Image.fromarray(viewable_image.cpu().numpy().transpose(1, 2, 0).astype('uint8'))
+        label_image, tensor_image = viewable_image_label_pair_to_images(viewable_image,
+                                                                        viewable_label)
 
         # With the label and the image, we can blend the segmentation
         # and label on top of the original image
@@ -838,9 +846,8 @@ def save_interesting_images_to_tensorboard(summary_writer,
             viewable_label = viewable["label"]
             palette = network_input["label_palette"]
 
-            label_image = segmentation_to_image(viewable_label.cpu().numpy(),
-                                                palette=palette)
-            tensor_image = Image.fromarray(viewable_image.cpu().numpy().transpose(1, 2, 0).astype('uint8'))
+            label_image, tensor_image = viewable_image_label_pair_to_images(viewable_image,
+                                                                            viewable_label)
 
             # With the label and the image, we can blend the segmentation
             # and label on top of the original image
