@@ -438,16 +438,22 @@ def evaluation(model):
                 model.train()
 
 
-def segment_and_save(model, input, target, image_path, log_path, epoch, palette=None):
-    """Segment a single image image and save it."""
+def segment_image(model, input):
+    """Segment an image and return the predictions and output."""
     with evaluation(model):
         output = model(input.unsqueeze(0))
         pred = torch.argmax(output.detach()[0], dim=0).cpu().byte().numpy()
-        miou = calculate_miou(output.detach()[0], target)
-        save_segmentation(pred, image_path, palette=palette)
+        return pred, output[0]
 
-        with open(log_path, "a+") as miou_log:
-            miou_log.write("{} {}\n".format(epoch, miou))
+
+def segment_and_save(model, input, target, image_path, log_path, epoch, palette=None):
+    """Segment a single image image and save it."""
+    pred, output = segment_image(model, input)
+    miou = calculate_miou(output.detach(), target)
+    save_segmentation(pred, image_path, palette=palette)
+
+    with open(log_path, "a+") as miou_log:
+        miou_log.write("{} {}\n".format(epoch, miou))
 
 def splice_into_path(path, splice):
     """Splice something into path, before the extension."""
