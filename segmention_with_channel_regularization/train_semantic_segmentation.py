@@ -750,6 +750,151 @@ def save_segmentations_for_first_n_images(model, dataset, path, n, device):
     return [functor_factory(i) for i in range(0, n)]
 
 
+def segment_and_tensorify(model, image, palette=None):
+    """Segment an image, then convert predictions to tensor."""
+    pred, output = segment_image(model, input)
+    return torch.tensor(pred), output
+
+
+def black_to_transparency(img):
+    """Convert black pixels to alpha."""
+    x = np.asarray(img.convert('RGBA')).copy()
+    x[:, :, 3] = (255 * (x[:, :, :3] != 0).any(axis=2)).astype(np.uint8)
+
+    return Image.fromarray(x)
+
+
+def overlay_segmentation(image, segmentation_image, blend_alpha=0.3):
+    """Overlay the segmentation on the original image
+
+    Black pixels are converted to alpha.
+    """
+    return Image.blend(image,
+                       black_to_transparency(segmentation_image).convert('RGB'),
+                       alpha=blend_alpha)
+
+
+def write_first_n_images_to_tensorboard(model, dataset, summary_writer, n, device):
+    """Create functions to save segmentations for the first n images."""
+    def on_received_image(i,
+                          image,
+                          viewable_image,
+                          viewable_label,
+                          palette=None,
+                          *args,
+                          **kwargs):
+        def on_received_statistics(statistics):
+            """We got the statistics, now we can segment the image."""
+            if statistics["mode"] != "validation" or statistics["batch_index"] != 0:
+                return
+
+            pred, output_tensor = segment_image(model, image)
+            miou = calculate_miou(output_tensor.detach(), viewable_label)
+            segmentation_image = segmentation_to_image(pred,
+                                                       palette=palette)
+
+            # Blend segmentation on top of real image
+            overlay_segmentation_image = overlay_segmentation(tensor_image, segmentation_image)
+
+            summary_writer.add_images("validation/reference/{}".format(i), np.hstack([
+                np.asarray(overlay_label_image.convert('RGB')),
+                np.asarray(overlay_segmentation_image.convert('RGB'))
+            ]), global_step=statistics["epoch"], dataformats='HWC')
+            summary_writer.add_scalar("validation/reference/{}/mIoU".format(i),
+                                      miou,
+                                      global_step=statistics["epoch"])
+
+        label_image = segmentation_to_image(viewable_label.cpu().numpy(),
+                                            palette=palette)
+        tensor_image = Image.fromarray(viewable_image.cpu().numpy().transpose(1, 2, 0).astype('uint8'))
+
+        # With the label and the image, we can blend the segmentation
+        # and label on top of the original image
+        overlay_label_image = overlay_segmentation(tensor_image, label_image)
+
+        return on_received_statistics
+
+
+    functor_factory = create_functor_for_segmenting_image(dataset,
+                                                          on_received_image,
+                                                          device)
+
+    return [functor_factory(i) for i in range(0, n)]
+
+
+def save_interesting_images_to_tensorboard(summary_writer,
+                                           device):
+    """Save some interesting images from the validation process on each epoch.
+
+    'Interesting' is defined as the three images with the best segmentation,
+    the three images with the worst segmentation and the three images in the
+    middle.
+    """
+    def save_pairs(model, pairs, epoch, tag):
+        """Helper to save pairs of images."""
+        for i, pair in enumerate(pairs):
+            network_input, viewable = pair
+            viewable_image = viewable["image"]
+            viewable_label = viewable["label"]
+            palette = network_input["label_palette"]
+
+            label_image = segmentation_to_image(viewable_label.cpu().numpy(),
+                                                palette=palette)
+            tensor_image = Image.fromarray(viewable_image.cpu().numpy().transpose(1, 2, 0).astype('uint8'))
+
+            # With the label and the image, we can blend the segmentation
+            # and label on top of the original image
+            overlay_label_image = overlay_segmentation(tensor_image, label_image)
+
+            pred, output_tensor = segment_image(model, network_input["image"].to(device))
+            miou = calculate_miou(output_tensor.detach(), viewable_label)
+            segmentation_image = segmentation_to_image(pred,
+                                                       palette=palette)
+
+            # Blend segmentation on top of real image
+            overlay_segmentation_image = overlay_segmentation(tensor_image, segmentation_image)
+
+            summary_writer.add_images("validation/{}/{}".format(tag, i), np.hstack([
+                np.asarray(overlay_label_image.convert('RGB')),
+                np.asarray(overlay_segmentation_image.convert('RGB'))
+            ]), global_step=epoch, dataformats='HWC')
+            summary_writer.add_scalar("validation/{}/{}/mIoU".format(tag, i),
+                                      miou,
+                                      global_step=epoch)
+
+
+    def _inner(model, optimizer, val_loader, mious, epoch):
+        ordered_mious = mious.argsort()
+        viewable_val_loader = val_loader.dataset.with_viewable_transforms()
+
+        length = len(ordered_mious)
+        middle = (length - 1) // 2
+        worst_three = [(val_loader.dataset[i], viewable_val_loader[i]) for i in ordered_mious[:3]]
+        best_three = [(val_loader.dataset[i], viewable_val_loader[i]) for i in ordered_mious[-3:]]
+        middle_three = [(val_loader.dataset[i], viewable_val_loader[i]) for i in ordered_mious[middle - 1:middle + 1]]
+
+        # Now that we have the worst, best and middle images,
+        # save them
+        save_pairs(model, worst_three, epoch, "worst")
+        save_pairs(model, best_three, epoch, "best")
+        save_pairs(model, middle_three, epoch, "middle")
+
+    return _inner
+
+
+def update_tensorboard_logs(summary_writer):
+    """A function to write new logs to tensorboard."""
+    def on_statistics_available(statistics):
+        summary_writer.add_scalar("{}/loss".format(statistics["mode"]),
+                                  statistics["statistics"]["loss"],
+                                  statistics["epoch"])
+        summary_writer.add_scalar("{}/mIoU".format(statistics["mode"]),
+                                  statistics["statistics"]["mIoU"],
+                                  statistics["epoch"])
+
+    return on_statistics_available
+
+
 def create_model(input_channels, args):
     """Create model from the arguments."""
     if args.model == "deeplabv3":
@@ -856,6 +1001,7 @@ def main():
                       epochs=args.epochs,
                       statistics_callback=call_many(
                           log_statistics(args.log_statistics),
+                          update_tensorboard_logs(writer),
                           # Take the first image from the first three batches
                           *(save_segmentations_for_first_n_images(model,
                                                                   val_loader.dataset,
@@ -873,7 +1019,12 @@ def main():
                                                                       "train"
                                                                   ),
                                                                   3,
-                                                                  device))
+                                                                  device) +
+                            write_first_n_images_to_tensorboard(model,
+                                                                val_loader.dataset,
+                                                                writer,
+                                                                3,
+                                                                device))
                       ),
                       epoch_end_callback=call_many(
                           save_model_on_better_miou(args.save_to,
@@ -881,7 +1032,8 @@ def main():
                           save_interesting_images(os.path.join(args.save_interesting_images,
                                                                "interesting",
                                                                "image.png"),
-                                                  device)
+                                                  device),
+                          save_interesting_images_to_tensorboard(writer, device)
                       ),
                       start_epoch=start_epoch)
 
@@ -892,26 +1044,32 @@ def main():
                                                          device,
                                                          args.epochs,
                                                          statistics_callback=call_many(
-                          log_statistics(args.log_statistics),
-                          # Take the first image from the first three batches
-                          *(save_segmentations_for_first_n_images(model,
-                                                                  val_loader.dataset,
-                                                                  os.path.join(
-                                                                      args.save_interesting_images,
-                                                                      "segmentations"
-                                                                  ),
-                                                                  3,
-                                                                  device) +
-                            save_segmentations_for_first_n_images(model,
-                                                                  train_loader.dataset,
-                                                                  os.path.join(
-                                                                      args.save_interesting_images,
-                                                                      "segmentations",
-                                                                      "train"
-                                                                  ),
-                                                                  3,
-                                                                  device))
-                      ))
+                                                             update_tensorboard(writer),
+                                                             log_statistics(args.log_statistics),
+                                                             # Take the first image from the first three batches
+                                                             *(save_segmentations_for_first_n_images(model,
+                                                                                                     val_loader.dataset,
+                                                                                                     os.path.join(
+                                                                                                         args.save_interesting_images,
+                                                                                                         "segmentations"
+                                                                                                     ),
+                                                                                                     3,
+                                                                                                     device) +
+                                                               save_segmentations_for_first_n_images(model,
+                                                                                                     train_loader.dataset,
+                                                                                                     os.path.join(
+                                                                                                         args.save_interesting_images,
+                                                                                                         "segmentations",
+                                                                                                         "train"
+                                                                                                     ),
+                                                                                                     3,
+                                                                                                     device) +
+                                                               write_first_n_images_to_tensorboard(model,
+                                                                                                   val_loader.dataset,
+                                                                                                   writer,
+                                                                                                   3,
+                                                                                                   device))
+                                                         ))
 
     save_interesting_images(os.path.join(args.save_interesting_images,
                                          "interesting",
