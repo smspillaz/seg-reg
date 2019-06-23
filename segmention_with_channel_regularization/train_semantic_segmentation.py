@@ -470,10 +470,15 @@ def hide_axis(figure):
     return figure
 
 
+def tensor_to_image(tensor):
+    """Convert torch tensor to image."""
+    return tensor.cpu().numpy().transpose(2, 1, 0) / 255.0
+
+
 def save_input_image(input, path):
     """Save the input image tensor somewhere."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    img = input.cpu().numpy().transpose(1, 2, 0) / 255.0
+    img = tensor_to_image(input)
     hide_axis(sns.mpl.pyplot.imshow(img).get_figure()).savefig(path,
                                                                bbox_inches="tight",
                                                                pad_inches=0)
