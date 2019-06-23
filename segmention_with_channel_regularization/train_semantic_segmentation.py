@@ -1043,7 +1043,15 @@ def main():
                                                                 val_loader.dataset,
                                                                 writer,
                                                                 3,
-                                                                device))
+                                                                device,
+                                                                set_name="validation"),
+                            write_first_n_images_to_tensorboard(model,
+                                                                train_loader.dataset,
+                                                                writer,
+                                                                3,
+                                                                device,
+                                                                set_name="train"))
+
                       ),
                       epoch_end_callback=call_many(
                           save_model_on_better_miou(args.save_to,
@@ -1087,7 +1095,15 @@ def main():
                                                                                                    val_loader.dataset,
                                                                                                    writer,
                                                                                                    3,
-                                                                                                   device))
+                                                                                                   device,
+                                                                                                   set_name="validation"),
+                                                               write_first_n_images_to_tensorboard(model,
+                                                                                                   train_loader.dataset,
+                                                                                                   writer,
+                                                                                                   3,
+                                                                                                   device,
+                                                                                                   set_name="train"))
+
                                                          ))
 
     save_interesting_images(os.path.join(args.save_interesting_images,
