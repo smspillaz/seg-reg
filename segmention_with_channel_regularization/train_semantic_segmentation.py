@@ -699,9 +699,10 @@ def call_many(*functions):
     return _inner
 
 
-def save_segmentations_for_first_n_images(model, dataset, path, n, device):
-    """Create functions to save segmentations for the first n images."""
-    def functor_for_image(i):
+def create_functor_for_segmenting_image(dataset, image_callback, device, *args, **kwargs):
+    """Create a functor for segmenting the image based on its position in the dataset."""
+    def create_functor_for_image(i):
+        """Segment a given image from the dataset."""
         input_pair = dataset_with_deterministic_transforms[i]
         viewable_pair = dataset_with_viewable_transforms[i]
         image = input_pair["image"].to(device)
@@ -709,6 +710,29 @@ def save_segmentations_for_first_n_images(model, dataset, path, n, device):
         viewable_label = viewable_pair["label"].to(device)
         palette = viewable_pair["label_palette"]
 
+        return image_callback(i,
+                              image,
+                              viewable_image,
+                              viewable_label,
+                              palette=palette,
+                              *args,
+                              **kwargs)
+
+
+    dataset_with_deterministic_transforms = dataset.with_deterministic_transforms()
+    dataset_with_viewable_transforms = dataset.with_viewable_transforms()
+    return create_functor_for_image
+
+
+def save_segmentations_for_first_n_images(model, dataset, path, n, device):
+    """Create functions to save segmentations for the first n images."""
+    def on_received_image(i,
+                          image,
+                          viewable_image,
+                          viewable_label,
+                          palette=None,
+                          *args,
+                          **kwargs):
         return save_segmentations_for_image(model,
                                             viewable_image,
                                             image,
@@ -716,9 +740,12 @@ def save_segmentations_for_first_n_images(model, dataset, path, n, device):
                                             os.path.join(path, "image_{}.png".format(i)),
                                             palette=palette)
 
-    dataset_with_deterministic_transforms = dataset.with_deterministic_transforms()
-    dataset_with_viewable_transforms = dataset.with_viewable_transforms()
-    return [functor_for_image(i) for i in range(0, n)]
+
+    functor_factory = create_functor_for_segmenting_image(dataset,
+                                                          on_received_image,
+                                                          device)
+
+    return [functor_factory(i) for i in range(0, n)]
 
 
 def create_model(input_channels, args):
