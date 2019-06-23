@@ -1,8 +1,13 @@
 #!/bin/bash
+set -x
 
 EXPERIMENT=${EXPERIMENT:-default}
 
-python train_semantic_segmentation.py \
+if [[ $DELETE == 1 ]]; then
+    rm -rf experiments/$EXPERIMENT;
+fi;
+
+python segmention_with_channel_regularization/train_semantic_segmentation.py \
     --cuda \
     --source-images ./data/VOCdevkit/VOC2012/JPEGImages \
     --segmentation-images ./data/VOCdevkit/VOC2012/SegmentationClass \
