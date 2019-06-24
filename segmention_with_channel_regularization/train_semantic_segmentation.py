@@ -36,6 +36,8 @@ from resnet import build_backbone
 from decoder import Decoder
 from spatial_pyramid_pooling import SpatialPoolingPyramid
 
+from utils.visualization import overlay_segmentation
+
 sns.mpl.use('Agg')
 
 
@@ -754,24 +756,6 @@ def segment_and_tensorify(model, image, palette=None):
     """Segment an image, then convert predictions to tensor."""
     pred, output = segment_image(model, input)
     return torch.tensor(pred), output
-
-
-def black_to_transparency(img):
-    """Convert black pixels to alpha."""
-    x = np.asarray(img.convert('RGBA')).copy()
-    x[:, :, 3] = (255 * (x[:, :, :3] != 0).any(axis=2)).astype(np.uint8)
-
-    return Image.fromarray(x)
-
-
-def overlay_segmentation(image, segmentation_image, blend_alpha=0.3):
-    """Overlay the segmentation on the original image
-
-    Black pixels are converted to alpha.
-    """
-    return Image.blend(image,
-                       black_to_transparency(segmentation_image).convert('RGB'),
-                       alpha=blend_alpha)
 
 
 def viewable_image_label_pair_to_images(viewable_image, viewable_label, palette=None):
