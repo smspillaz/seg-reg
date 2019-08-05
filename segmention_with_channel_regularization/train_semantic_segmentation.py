@@ -17,6 +17,7 @@ import torchvision.transforms as transforms
 
 import tqdm
 
+from collections import defaultdict
 from contextlib import contextmanager
 
 from torch.utils.data import DataLoader
@@ -970,6 +971,106 @@ def create_model(input_channels, args):
     return model
 
 
+class FocalLoss(nn.Module):
+    """FocalLoss implementation.
+
+    Essentially we don't penalize a model for being reasonably confident
+    about a class prediction, even if it is not perfectly confident. This
+    means that we pay attention to other gradients, which may help to
+    improve overall classification.
+    """
+
+    def __init__(self, gamma=0, alpha=None, size_average=True, ignore_index=None):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.ignore_index = ignore_index
+        if isinstance(alpha, (float, int)): self.alpha = torch.Tensor([alpha,1-alpha])
+        if isinstance(alpha, list): self.alpha = torch.Tensor(alpha)
+        self.size_average = size_average
+
+    def forward(self, input, target):
+        if input.dim() > 2:
+            input = input.view(input.size(0), input.size(1), -1)  # N,C,H,W => N,C,H*W
+            input = input.transpose(1, 2)    # N,C,H*W => N,H*W,C
+            input = input.contiguous().view(-1, input.size(2))   # N,H*W,C => N*H*W,C
+        target = remap_tensor_digit(target.view(-1,1), { 255: 0 })
+
+        logpt = F.log_softmax(input, dim=1)
+        logpt = logpt.gather(1, target.long())
+        logpt = logpt.view(-1)
+        pt = logpt.exp()
+
+        if self.alpha is not None:
+            if self.alpha.type() != input.data.type():
+                self.alpha = self.alpha.type_as(input.data)
+            at = self.alpha.gather(0, target.data.view(-1).long())
+            logpt = logpt * at
+
+        loss = -1 * (1 - pt) ** self.gamma * logpt
+        loss = loss * torch.tensor([1.0 if t != self.ignore_index else 0.0 for t in target.view(-1).cpu().numpy()],
+                                   device=loss.device,
+                                   dtype=torch.float32)
+        if self.size_average:
+            return loss.mean()
+        else:
+            return loss.sum()
+
+
+def remap_tensor_digit(tensor, digit_map):
+    """Remap the digit in tensor."""
+    return torch.tensor([
+        digit_map[int(d)] if int(d) in digit_map else int(d) for d in tensor.cpu().numpy().ravel().tolist()
+    ], dtype=torch.long, device=tensor.device).view(tensor.shape)
+
+
+def dice_loss(eps=1e-7, ignore_index=255):
+    """Computes the Sørensen–Dice loss.
+
+    Note that PyTorch optimizers minimize a loss. In this
+    case, we would like to maximize the dice loss so we
+    return the negated dice loss.
+    Args:
+        true: a tensor of shape [B, 1, H, W].
+        logits: a tensor of shape [B, C, H, W]. Corresponds to
+            the raw output or logits of the model.
+        eps: added to the denominator for numerical stability.
+    Returns:
+        dice_loss: the Sørensen–Dice loss.
+    """
+    def inner(logits, true):
+        num_classes = logits.shape[1]
+        if num_classes == 1:
+            true_1_hot = torch.eye(num_classes + 1)[true.squeeze(1)]
+            true_1_hot = true_1_hot.permute(0, 3, 1, 2).float()
+            true_1_hot_f = true_1_hot[:, 0:1, :, :]
+            true_1_hot_s = true_1_hot[:, 1:2, :, :]
+            true_1_hot = torch.cat([true_1_hot_s, true_1_hot_f], dim=1)
+            pos_prob = torch.sigmoid(logits)
+            neg_prob = 1 - pos_prob
+            probas = torch.cat([pos_prob, neg_prob], dim=1)
+        else:
+            true_1_hot = torch.eye(num_classes)[remap_tensor_digit(true.squeeze(1), { 255: 0 })]
+            true_1_hot = true_1_hot.permute(0, 3, 1, 2).float()
+            probas = F.softmax(logits, dim=1)
+        true_1_hot = true_1_hot.type(logits.type())
+        dims = (0,) + tuple(range(2, true.ndimension()))
+        intersection = torch.sum(probas * true_1_hot, dims)
+        cardinality = torch.sum(probas + true_1_hot, dims)
+        dice_loss = (2. * intersection / (cardinality + eps)).mean()
+        return (1 - dice_loss)
+    return inner
+
+
+
+LOSS_FUNCTIONS = {
+    "cross-entropy": segmentation_cross_entropy_loss(size_average=None, ignore_index=255),
+    "focal-loss": FocalLoss(gamma=2, size_average=True, ignore_index=255),
+    "dice-loss": dice_loss(ignore_index=255)
+}
+
+
+
 def main():
     """Entry point."""
     parser = argparse.ArgumentParser("Train semantic segmentation model.")
@@ -1034,9 +1135,10 @@ def main():
     model = create_model(input_channels=3, args=args).to(device)
 
     print(model)
-    criterion = segmentation_cross_entropy_loss(size_average=None,
-                                                ignore_index=255,
-                                                device=device)
+    criterion = LOSS_FUNCTIONS[args.loss_function]
+    #criterion = segmentation_cross_entropy_loss(size_average=None,
+    #                                            ignore_index=255,
+    #                                            device=device)
     optimizer = optim.SGD(differential_learning_rates(model,
                                                       model.optimizer_params(),
                                                       args.learning_rate),
