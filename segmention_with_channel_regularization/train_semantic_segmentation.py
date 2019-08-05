@@ -35,6 +35,7 @@ from PIL import Image
 from resnet import build_backbone
 from decoder import Decoder
 from spatial_pyramid_pooling import SpatialPoolingPyramid
+from patch_dropout import DropoutActivationPatch
 
 from utils.visualization import overlay_segmentation
 
@@ -47,25 +48,27 @@ class DeepLabModel(nn.Module):
     def __init__(self,
                  input_channels=3,
                  num_classes=21,
-                 drop_rate=0.0,
-                 pyramid_use_channel_dropout=False,
-                 decoder_use_channel_dropout=False,
+                 drop_layer_cls=None,
+                 feature_detection_dropout_rate=0.0,
+                 pyramid_dropout_rate=0.0,
+                 decoder_dropout_rate=0.0,
                  decoder_use_channel_attention=False):
         """Initialize parameters."""
         super().__init__()
-        self.feature_detection_layers = build_backbone(input_channels, drop_rate=drop_rate)
+        self.feature_detection_layers = build_backbone(input_channels,
+                                                       drop_layer=drop_layer_cls(feature_detection_dropout_rate) if drop_layer_cls else None)
         self.spatial_pyramid_pooling = SpatialPoolingPyramid(
             input_channels=2048,
             dilations=(6, 12, 18),
             output_pooling_channels=256,
-            use_channel_dropout=pyramid_use_channel_dropout
+            drop_layer=drop_layer_cls(pyramid_dropout_rate) if drop_layer_cls else None
         )
         self.decoder = Decoder(low_level_input_channels=256,
                                low_level_output_channels=48,
                                pyramid_input_channels=256,
                                pyramid_output_channels=256,
                                num_classes=21,
-                               use_channel_dropout=decoder_use_channel_dropout,
+                               drop_layer=drop_layer_cls(decoder_dropout_rate) if drop_layer_cls else None,
                                use_channel_attention=decoder_use_channel_attention)
 
     def forward(self, input):
@@ -898,14 +901,38 @@ def update_tensorboard_logs(summary_writer):
     return on_statistics_available
 
 
+def read_classes_trainval(classes_trainval):
+    """Read the trainval file and output list of strings."""
+    with open(classes_trainval, "r") as f:
+        return [l.split()[0] for l in f.readlines() if l.split()[1] != "-1"]
+
+
+def read_classes_list(classes_directory):
+    """For each class in the classes directory, list image identifiers per class."""
+    for filename in fnmatch.filter(os.listdir(classes_directory), "*_trainval.txt"):
+        image_class = filename.split("_")[0]
+        yield (image_class,
+               read_classes_trainval(os.path.join(classes_directory, filename)))
+
+
+def create_drop_layer_cls(layer_type):
+    """Create a Dropout layer depending on the type."""
+    if layer_type == "channel":
+        return nn.Dropout2d
+    elif layer_type == "patch":
+        return DropoutActivationPatch
+
+
+
 def create_model(input_channels, args):
     """Create model from the arguments."""
     if args.model == "deeplabv3":
         model = DeepLabModel(input_channels=3,
                              num_classes=args.num_classes,
-                             drop_rate=args.drop_rate,
-                             pyramid_use_channel_dropout=args.pyramid_use_channel_dropout,
-                             decoder_use_channel_dropout=args.decoder_use_channel_dropout,
+                             drop_layer_cls=create_drop_layer_cls(args.drop_type),
+                             feature_detection_dropout_rate=args.feature_detection_dropout_rate,
+                             pyramid_dropout_rate=args.pyramid_dropout_rate,
+                             decoder_dropout_rate=args.decoder_dropout_rate,
                              decoder_use_channel_attention=args.decoder_use_channel_attention)
     elif args.model == "modelzoo-deeplabv3":
         zoo_model = torch.hub.load('pytorch/vision', 'deeplabv3_resnet101', pretrained=True)
@@ -926,19 +953,23 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=0.007, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
-    parser.add_argument("--drop-rate", type=float, default=0.0, help="Feature Detection Dropout2D rate")
-    parser.add_argument("--decoder-use-channel-dropout",
-                        action='store_true',
-                        default=False,
-                        help="Use Dropout2D in Decoder layers.")
+    parser.add_argument("--drop-type", type=str, choices=("channel", "patch"), default="channel", help="Dropout type")
+    parser.add_argument("--feature-detection-dropout-rate",
+                        type=float,
+                        default=0.0,
+                        help="Dropout rate in feature detection layers")
+    parser.add_argument("--decoder-dropout-rate",
+                        type=float,
+                        default=0.0,
+                        help="Dropout rate for Decoder layers.")
     parser.add_argument("--decoder-use-channel-attention",
                         action='store_true',
                         default=False,
                         help="Use ChannelAttention in Decoder layers.")
-    parser.add_argument("--pyramid-use-channel-dropout",
-                        action='store_true',
-                        default=False,
-                        help="Use Dropout2D in Pyramid Pooling layers.")
+    parser.add_argument("--pyramid-dropout-rate",
+                        type=float,
+                        default=0.0,
+                        help="Dropout rate for Pyramid Pooling layers.")
     parser.add_argument("--num-classes", type=int, default=21, help="Number of segmentation classes")
     parser.add_argument("--save-to", type=str, help="Where to save the model to", required=True)
     parser.add_argument("--log-statistics", type=str, help="Where to log statistics to", default="logs/statistics")

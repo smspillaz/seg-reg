@@ -5,6 +5,11 @@ import torch.nn.functional as F
 import math
 
 
+class Passthrough(nn.Module):
+    def forward(self, x):
+        return x
+
+
 class ConvBNReLU(nn.Module):
     """A simple building block that does a convolution, batch normalization, and ReLU."""
 
@@ -37,7 +42,11 @@ class ConvBNReLU(nn.Module):
 class SpatialPoolingPyramid(nn.Module):
     """Pool over many different convolutions with different dilations."""
 
-    def __init__(self, input_channels, dilations, output_pooling_channels=256, use_channel_dropout=False):
+    def __init__(self,
+                 input_channels,
+                 dilations,
+                 output_pooling_channels=256,
+                 drop_layer=None):
         """Initialize the differnent pooling layers."""
         super().__init__()
         self.pooling_layers = nn.ModuleList([
@@ -53,7 +62,7 @@ class SpatialPoolingPyramid(nn.Module):
         self.concat_conv = ConvBNReLU(output_pooling_channels * (len(dilations) + 2),
                                       output_pooling_channels,
                                       kernel_size=1)
-        self.dropout = (nn.Dropout2d if use_channel_dropout else nn.Dropout)(0.5)
+        self.dropout = drop_layer or Passthrough()
 
         self._init_weight()
 

@@ -7,6 +7,11 @@ import math
 from collections import OrderedDict
 
 
+class Passthrough(nn.Module):
+    def forward(self, x):
+        return x
+
+
 class ConvBNReLU(nn.Module):
     """Convolution, BatchNorm, ReLU"""
 
@@ -80,10 +85,12 @@ class Decoder(nn.Module):
                  pyramid_input_channels,
                  pyramid_output_channels,
                  num_classes,
-                 use_channel_dropout=False,
+                 drop_layer=None,
                  use_channel_attention=False):
         """Initialize the decoder."""
         super().__init__()
+
+        drop_layer = drop_layer or Passthrough()
 
         self.conv1 = ConvBNReLU(low_level_input_channels,
                                 low_level_output_channels,
@@ -98,15 +105,14 @@ class Decoder(nn.Module):
                        stride=1,
                        padding=1,
                        bias=False),
-            # TODO: Apply Channel Dropout if specified
-            (nn.Dropout2d if use_channel_dropout else nn.Dropout)(0.5),
+            drop_layer,
             ConvBNReLU(pyramid_output_channels,
                        pyramid_output_channels,
                        kernel_size=3,
                        stride=1,
                        padding=1,
                        bias=False),
-            (nn.Dropout2d if use_channel_dropout else nn.Dropout)(0.1),
+            drop_layer,
             nn.Conv2d(pyramid_output_channels, num_classes, kernel_size=1, stride=1)
         )
 
