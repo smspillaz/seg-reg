@@ -1,5 +1,7 @@
 import argparse
+import fnmatch
 import os
+import itertools
 import json
 import sys
 
@@ -184,7 +186,7 @@ def differential_learning_rates(self, module_learning_rates, learning_rate):
 
 def read_list(path):
     with open(path) as f:
-        return [s.strip() for s in f.read().splitlines() if s.strip()]
+        return sorted([s.strip() for s in f.read().splitlines() if s.strip()])
 
 
 def check_exists(path):
@@ -273,13 +275,36 @@ class SpecifiedSegmentationImagesDataset(data.Dataset):
         )
 
 
-def list_proportion(source_list, proportion, batch_size):
-    """Get a proportion of the list."""
+def bound_list_by_proportion(source_list, proportion, alignment):
+    """Bound list by proportion, to the next alignment."""
     bound = int(len(source_list) * proportion)
-    bound += bound % batch_size
+    bound += bound % alignment
     bound = min(bound, len(source_list))
 
     return source_list[:bound]
+
+
+def list_proportion(source_list, proportion, classes_list, batch_size):
+    """Get a proportion of the list.
+    
+    If we don't have a list of classes, we do this the naive way
+    and just bound the list directly.
+
+    Otherwise if we have classes we can be a little smarter. Figure out
+    where the class list overlaps with the list itself using set
+    intersections, then limit the proportion of data within each
+    class list.
+    """
+    if not classes_list:
+        return bound_list_by_proportion(source_list, proportion, batch_size)
+
+    source_list_set = set(source_list)
+    classes_list_sets = {
+        k: bound_list_by_proportion(list(set(v) & source_list_set), proportion, 1)
+        for k, v in classes_list.items()
+    }
+
+    return sorted(list(itertools.chain.from_iterable(classes_list_sets.values())))
 
 
 def load_data(source_images,
@@ -290,7 +315,9 @@ def load_data(source_images,
               base_size=513,
               crop_size=513,
               batch_size=8,
-              limit_data=1.0):
+              limit_train_data=1.0,
+              limit_validation_data=1.0,
+              classes_list=None):
     """Create DataLoader objects for each of the three image sets.
 
     :source_images: are, as the name suggests, the source images.
@@ -310,13 +337,15 @@ def load_data(source_images,
     ])
 
     train_dataset = SpecifiedSegmentationImagesDataset(images_list=list_proportion(read_list(training_set),
-                                                                                   limit_data,
+                                                                                   limit_train_data,
+                                                                                   classes_list,
                                                                                    batch_size),
                                                        source_images_path=source_images,
                                                        target_images_path=segmentation_images,
                                                        transforms=training_transforms)
     validation_dataset = SpecifiedSegmentationImagesDataset(images_list=list_proportion(read_list(validation_set),
-                                                                                        limit_data,
+                                                                                        limit_validation_data,
+                                                                                        classes_list,
                                                                                         batch_size),
                                                             source_images_path=source_images,
                                                             target_images_path=segmentation_images,
@@ -982,7 +1011,13 @@ def main():
                         help="Which model to create",
                         default="deeplabv3",
                         choices=["deeplabv3", "modelzoo-deeplabv3"])
-    parser.add_argument("--limit-data", type=float, default=1.0, help="Percentage of data to use")
+    parser.add_argument("--limit-train-data", type=float, default=1.0, help="Percentage of training data to use")
+    parser.add_argument("--limit-validation-data", type=float, default=1.0, help="Percentage of validation data to use")
+    parser.add_argument("--classes-list", type=str, help="Path to image classes list")
+    parser.add_argument("--loss-function", type=str,
+                        help="Loss Function to use",
+                        choices=("cross-entropy", "focal-loss", "dice-loss"),
+                        default="cross-entropy")
     args = parser.parse_args()
 
     (train_loader,
@@ -993,7 +1028,9 @@ def main():
                               args.validation_set,
                               args.test_set,
                               batch_size=args.batch_size,
-                              limit_data=args.limit_data)
+                              limit_train_data=args.limit_train_data,
+                              limit_validation_data=args.limit_validation_data,
+                              classes_list=dict(read_classes_list(args.classes_list)))
     device = torch.device('cuda:0') if args.cuda else torch.device('cpu')
     model = create_model(input_channels=3, args=args).to(device)
 
