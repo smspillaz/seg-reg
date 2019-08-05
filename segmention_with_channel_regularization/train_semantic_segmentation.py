@@ -1175,44 +1175,24 @@ def main():
                           log_statistics(args.log_statistics),
                           update_tensorboard_logs(writer),
                           # Take the first image from the first three batches
-                          *(save_segmentations_for_first_n_images(model,
-                                                                  val_loader.dataset,
-                                                                  os.path.join(
-                                                                      args.save_interesting_images,
-                                                                      "segmentations"
-                                                                  ),
-                                                                  3,
-                                                                  device) +
-                            save_segmentations_for_first_n_images(model,
-                                                                  train_loader.dataset,
-                                                                  os.path.join(
-                                                                      args.save_interesting_images,
-                                                                      "segmentations",
-                                                                      "train"
-                                                                  ),
-                                                                  3,
-                                                                  device) +
-                            write_first_n_images_to_tensorboard(model,
-                                                                val_loader.dataset,
-                                                                writer,
-                                                                3,
-                                                                device,
-                                                                set_name="validation"),
-                            write_first_n_images_to_tensorboard(model,
-                                                                train_loader.dataset,
-                                                                writer,
-                                                                3,
-                                                                device,
-                                                                set_name="train"))
-
+                          *list(itertools.chain.from_iterable((
+                               write_first_n_images_to_tensorboard(model,
+                                                                   val_loader.dataset,
+                                                                   writer,
+                                                                   3,
+                                                                   device,
+                                                                   set_name="validation"),
+                               write_first_n_images_to_tensorboard(model,
+                                                                   train_loader.dataset,
+                                                                   writer,
+                                                                   3,
+                                                                   device,
+                                                                   set_name="train"))
+                         ))
                       ),
                       epoch_end_callback=call_many(
                           save_model_on_better_miou(args.save_to,
                                                     best_accumulated_miou),
-                          save_interesting_images(os.path.join(args.save_interesting_images,
-                                                               "interesting",
-                                                               "image.png"),
-                                                  device),
                           save_interesting_images_to_tensorboard(writer, device)
                       ),
                       start_epoch=start_epoch)
@@ -1224,39 +1204,23 @@ def main():
                                                          device,
                                                          args.epochs,
                                                          statistics_callback=call_many(
-                                                             update_tensorboard(writer),
+                                                             update_tensorboard_logs(writer),
                                                              log_statistics(args.log_statistics),
                                                              # Take the first image from the first three batches
-                                                             *(save_segmentations_for_first_n_images(model,
-                                                                                                     val_loader.dataset,
-                                                                                                     os.path.join(
-                                                                                                         args.save_interesting_images,
-                                                                                                         "segmentations"
-                                                                                                     ),
-                                                                                                     3,
-                                                                                                     device) +
-                                                               save_segmentations_for_first_n_images(model,
-                                                                                                     train_loader.dataset,
-                                                                                                     os.path.join(
-                                                                                                         args.save_interesting_images,
-                                                                                                         "segmentations",
-                                                                                                         "train"
-                                                                                                     ),
-                                                                                                     3,
-                                                                                                     device) +
-                                                               write_first_n_images_to_tensorboard(model,
-                                                                                                   val_loader.dataset,
-                                                                                                   writer,
-                                                                                                   3,
-                                                                                                   device,
-                                                                                                   set_name="validation"),
-                                                               write_first_n_images_to_tensorboard(model,
-                                                                                                   train_loader.dataset,
-                                                                                                   writer,
-                                                                                                   3,
-                                                                                                   device,
-                                                                                                   set_name="train"))
-
+                                                             *list(itertools.chain.from_iterable([
+                                                                  write_first_n_images_to_tensorboard(model,
+                                                                                                       val_loader.dataset,
+                                                                                                       writer,
+                                                                                                       3,
+                                                                                                       device,
+                                                                                                       set_name="validation"),
+                                                                   write_first_n_images_to_tensorboard(model,
+                                                                                                       train_loader.dataset,
+                                                                                                       writer,
+                                                                                                       3,
+                                                                                                       device,
+                                                                                                       set_name="train")
+                                                            ]))
                                                          ))
 
     save_interesting_images(os.path.join(args.save_interesting_images,
