@@ -944,21 +944,79 @@ def read_classes_list(classes_directory):
                read_classes_trainval(os.path.join(classes_directory, filename)))
 
 
-def create_drop_layer_cls(layer_type):
+
+def add_schedule(cls, query_step, max_steps):
+    class ScheduledDropoutLayer(nn.Module):
+        def __init__(self, p=1.0):
+            super().__init__()
+            self.dropout_cls = cls
+            self.dropout = self.dropout_cls(p=1.0)
+            self.current_step = 0
+            self.query_steps = query_step
+            self.max_steps = max_steps
+            self.p = p
+
+        def forward(self, x):
+            """Go forward, altering dropout layer if necessary."""
+            if self.training:
+                this_step = self.query_steps()
+                if this_step != self.current_step:
+                    self.current_step = this_step
+                    alpha = self.current_step / self.max_steps
+                    new_p = (1 * (1.0 - alpha) + self.p * (alpha))
+                    self.dropout = self.dropout_cls(p=new_p)
+                    tqdm.write("Update dropout p to {}".format(new_p))
+                
+            return self.dropout(x)
+    
+    return ScheduledDropoutLayer
+
+
+class ChannelUOut(nn.Module):
+    def __init__(self, p=1.0):
+        super().__init__()
+        self.p = p
+        self.dist = torch.distributions.uniform.Uniform(-p, p)
+    
+    def forward(x):
+        if self.training:
+            return x
+
+        _, c, __, ___ = x.shape
+        channel_samples = self.dist.sample(c).view(1, c)
+
+        return x + x * channel_samples
+
+
+def create_drop_layer_cls(layer_type, query_step, max_steps):
     """Create a Dropout layer depending on the type."""
     if layer_type == "channel":
-        return nn.Dropout2d
+        return add_schedule(nn.Dropout2d, query_step, max_steps)
+    elif layer_type == "channel-uout":
+        return add_schedule(ChannelUOut, query_step, max_steps)
     elif layer_type == "patch":
-        return DropoutActivationPatch
+        return add_schedule(DropoutActivationPatch, query_step, max_steps)
 
 
+class ScheduleTracker(object):
+    """Just keeps track of which epoch it is."""
+    def __init__(self, initial_epoch):
+        super().__init__()
+        self.epoch = initial_epoch
 
-def create_model(input_channels, args):
+    def query(self):
+        return self.epoch
+
+    def epoch_end(self):
+        self.epoch += 1
+
+
+def create_model(input_channels, args, schedule_tracker):
     """Create model from the arguments."""
     if args.model == "deeplabv3":
         model = DeepLabModel(input_channels=3,
                              num_classes=args.num_classes,
-                             drop_layer_cls=create_drop_layer_cls(args.drop_type),
+                             drop_layer_cls=create_drop_layer_cls(args.drop_type, schedule_tracker.query, args.full_dropout_epoch),
                              feature_detection_dropout_rate=args.feature_detection_dropout_rate,
                              pyramid_dropout_rate=args.pyramid_dropout_rate,
                              decoder_dropout_rate=args.decoder_dropout_rate,
@@ -1081,8 +1139,9 @@ def main():
     parser.add_argument("--test-set", type=str, help="Path to text file containing test set filenames", required=True)
     parser.add_argument("--learning-rate", type=float, default=0.007, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
+    parser.add_arguemnt("--full-dropout-epoch", type=int, default=30, help="Number of epochs until dropout is effective")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
-    parser.add_argument("--drop-type", type=str, choices=("channel", "patch"), default="channel", help="Dropout type")
+    parser.add_argument("--drop-type", type=str, choices=("channel", "patch", "channel-uout"), default="channel", help="Dropout type")
     parser.add_argument("--feature-detection-dropout-rate",
                         type=float,
                         default=0.0,
@@ -1132,13 +1191,11 @@ def main():
                               limit_validation_data=args.limit_validation_data,
                               classes_list=dict(read_classes_list(args.classes_list)))
     device = torch.device('cuda:0') if args.cuda else torch.device('cpu')
-    model = create_model(input_channels=3, args=args).to(device)
+    schedule_tracker = ScheduleTracker(0)
+    model = create_model(input_channels=3, args=args, schedule_tracker=schedule_tracker).to(device)
 
     print(model)
     criterion = LOSS_FUNCTIONS[args.loss_function]
-    #criterion = segmentation_cross_entropy_loss(size_average=None,
-    #                                            ignore_index=255,
-    #                                            device=device)
     optimizer = optim.SGD(differential_learning_rates(model,
                                                       model.optimizer_params(),
                                                       args.learning_rate),
@@ -1154,6 +1211,7 @@ def main():
         best_accumulated_miou = saved_info['best_pred']
         optimizer.load_state_dict(saved_info['optimizer'])
         model.load_state_dict(saved_info['state_dict'])
+        schedule_tracker.epoch = start_epoch
         print("Loaded model from {}".format(args.load_from))
 
     scheduler = PolynomialLearningRateScheduler(optimizer,
@@ -1193,7 +1251,8 @@ def main():
                       epoch_end_callback=call_many(
                           save_model_on_better_miou(args.save_to,
                                                     best_accumulated_miou),
-                          save_interesting_images_to_tensorboard(writer, device)
+                          save_interesting_images_to_tensorboard(writer, device),
+                          lambda m, p, e, t: schedule_tracker.epoch_end()
                       ),
                       start_epoch=start_epoch)
 
