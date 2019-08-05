@@ -115,11 +115,10 @@ class DeepLabModelZooModel(nn.Module):
 
 
 def segmentation_cross_entropy_loss(size_average,
-                                    ignore_index,
-                                    device):
+                                    ignore_index):
     """Segmentation loss from channels."""
     criterion = nn.CrossEntropyLoss(ignore_index=ignore_index,
-                                    size_average=size_average).to(device)
+                                    size_average=size_average)
 
     def inner(result, target):
         """Divide loss by size of batch."""
