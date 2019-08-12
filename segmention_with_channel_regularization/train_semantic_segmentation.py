@@ -977,9 +977,9 @@ class ChannelUOut(nn.Module):
         super().__init__()
         self.p = p
         self.dist = torch.distributions.uniform.Uniform(-p, p)
-    
-    def forward(x):
-        if self.training:
+
+    def forward(self, x):
+        if not self.training:
             return x
 
         _, c, __, ___ = x.shape
