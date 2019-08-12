@@ -1139,7 +1139,7 @@ def main():
     parser.add_argument("--test-set", type=str, help="Path to text file containing test set filenames", required=True)
     parser.add_argument("--learning-rate", type=float, default=0.007, help="Learning rate")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
-    parser.add_arguemnt("--full-dropout-epoch", type=int, default=30, help="Number of epochs until dropout is effective")
+    parser.add_argument("--full-dropout-epoch", type=int, default=30, help="Number of epochs until dropout is effective")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size")
     parser.add_argument("--drop-type", type=str, choices=("channel", "patch", "channel-uout"), default="channel", help="Dropout type")
     parser.add_argument("--feature-detection-dropout-rate",
