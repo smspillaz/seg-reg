@@ -1252,7 +1252,7 @@ def main():
                           save_model_on_better_miou(args.save_to,
                                                     best_accumulated_miou),
                           save_interesting_images_to_tensorboard(writer, device),
-                          lambda m, p, e, t: schedule_tracker.epoch_end()
+                          lambda m, o, v, i, e: schedule_tracker.epoch_end(e)
                       ),
                       start_epoch=start_epoch)
 
