@@ -963,7 +963,7 @@ def add_schedule(cls, query_step, max_steps):
                 if this_step != self.current_step:
                     self.current_step = this_step
                     alpha = self.current_step / self.max_steps
-                    new_p = (1 * (1.0 - alpha) + self.p * (alpha))
+                    new_p = min((0 * (1.0 - alpha) + self.p * (alpha)), self.p)
                     self.dropout = self.dropout_cls(p=new_p)
                     tqdm.write("Update dropout p to {}".format(new_p))
                 
