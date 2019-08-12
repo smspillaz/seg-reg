@@ -983,7 +983,7 @@ class ChannelUOut(nn.Module):
             return x
 
         _, c, __, ___ = x.shape
-        channel_samples = self.dist.sample(c).view(1, c)
+        channel_samples = self.dist.sample([c]).view(1, c, 1, 1).to(x.device)
 
         return x + x * channel_samples
 
