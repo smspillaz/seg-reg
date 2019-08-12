@@ -1007,8 +1007,8 @@ class ScheduleTracker(object):
     def query(self):
         return self.epoch
 
-    def epoch_end(self):
-        self.epoch += 1
+    def epoch_end(self, epoch):
+        self.epoch = epoch + 1
 
 
 def create_model(input_channels, args, schedule_tracker):
