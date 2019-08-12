@@ -17,4 +17,5 @@ python segmention_with_channel_regularization/train_semantic_segmentation.py \
     --save-to experiments/$EXPERIMENT/model.pt \
     --log-statistics experiments/$EXPERIMENT/logs/statistics \
     --save-interesting-images experiments/$EXPERIMENT/logs/interesting \
+    --classes-list ./data/VOCdevkit/VOC2012/ImageSets/Main/ \
     $@
