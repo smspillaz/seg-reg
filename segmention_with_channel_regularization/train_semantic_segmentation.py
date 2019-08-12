@@ -965,8 +965,8 @@ def add_schedule(cls, query_step, max_steps):
                     alpha = self.current_step / self.max_steps
                     new_p = min((0 * (1.0 - alpha) + self.p * (alpha)), self.p)
                     self.dropout = self.dropout_cls(p=new_p)
-                    tqdm.write("Update dropout p to {}".format(new_p))
-                
+                    tqdm.tqdm.write("Update dropout p to {} (max {})".format(new_p, self.p))
+
             return self.dropout(x)
     
     return ScheduledDropoutLayer
