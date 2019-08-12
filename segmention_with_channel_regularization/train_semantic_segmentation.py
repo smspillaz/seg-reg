@@ -951,7 +951,7 @@ def add_schedule(cls, query_step, max_steps):
             super().__init__()
             self.dropout_cls = cls
             self.dropout = self.dropout_cls(p=1.0)
-            self.current_step = 0
+            self.current_step = -1
             self.query_steps = query_step
             self.max_steps = max_steps
             self.p = p
