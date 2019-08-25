@@ -23,25 +23,25 @@ We noticed that the original DeepLabv3+ [paper](https://arxiv.org/abs/1802.02611
 
 ## VOC2012, 10 train images
 
-  Experiment             Mean mIoU    Std.    Worst mIoU   Med. mIoU   Best mIoU    Loss
-  --------------------- ----------- -------- ------------ ----------- ----------- --------
-  `pretrained-base`        0.81       0.09       0.55        0.82        0.99       0.02
-  `none`                   0.49       0.10       0.26        0.50        0.65       0.06
-  `resnet-chandrop`       *0.56*     *0.09*     *0.35*       0.50       *0.77*     *0.05*
-  `spp-chandrop`           0.54       0.10       0.28        0.53        0.74       0.06
-  `decoder-chandrop`       0.50      *0.09*      0.32        0.53        0.67       0.06
-  `upper-chandrop`         0.49      *0.09*      0.28        0.50        0.68       0.07
-  `all-chandrop`           0.55       0.11       0.27        0.55        0.76       0.06
-  `resnet-dropblock`       0.45       0.10       0.21        0.45        0.74       0.08
-  `spp-dropblock`          0.47      *0.09*      0.29        0.46        0.72       0.06
-  `decoder-dropblock`      0.51      *0.09*      0.34        0.50        0.68       0.07
-  `upper-dropblock`        0.51       0.10       0.30        0.51       *0.77*      0.07
-  `all-dropblock`          0.48       0.10       0.28        0.47        0.69       0.07
-  `resnet-uout`            0.50       0.11       0.31        0.49        0.74       0.06
-  `spp-uout`               0.50       0.11       0.29        0.50        0.74       0.06
-  `decoder-uout`           0.48       0.10       0.31        0.45        0.72       0.07
-  `upper-uout`            *0.56*     *0.09*      0.31       *0.57*       0.72      *0.05*
-  `all-uout`               0.52       0.10       0.31        0.51        0.76       0.06
+  |Experiment            | Mean mIoU|    Std.|    Worst mIoU|   Med. mIoU|   Best mIoU|    Loss|
+  |--------------------- |-----------| --------| ------------| -----------| -----------| --------|
+  |`pretrained-base`     |   0.81    |   0.09  |     0.55    |    0.82    |    0.99       0.02   |
+  |`none`                |   0.49    |   0.10  |     0.26    |    0.50    |    0.65       0.06   |
+  |`resnet-chandrop`     |  *0.56*   |  *0.09* |    *0.35*   |    0.50    |   *0.77*     *0.05*   |
+  |`spp-chandrop`        |   0.54    |   0.10  |     0.28    |    0.53    |    0.74       0.06   |
+  |`decoder-chandrop`    |   0.50    |  *0.09* |     0.32    |    0.53    |    0.67       0.06   |
+  |`upper-chandrop`      |   0.49    |  *0.09* |     0.28    |    0.50    |    0.68       0.07   |
+  |`all-chandrop`        |   0.55    |   0.11  |     0.27    |    0.55    |    0.76       0.06   |
+  |`resnet-dropblock`    |   0.45    |   0.10  |     0.21    |    0.45    |    0.74       0.08   |
+  |`spp-dropblock`       |   0.47    |  *0.09* |     0.29    |    0.46    |    0.72       0.06   |
+  |`decoder-dropblock`   |   0.51    |  *0.09* |     0.34    |    0.50    |    0.68       0.07   |
+  |`upper-dropblock`     |   0.51    |   0.10  |     0.30    |    0.51    |   *0.77*      0.07   |
+  |`all-dropblock`       |   0.48    |   0.10  |     0.28    |    0.47    |    0.69       0.07   |
+  |`resnet-uout`         |   0.50    |   0.11  |     0.31    |    0.49    |    0.74       0.06   |
+  |`spp-uout`            |   0.50    |   0.11  |     0.29    |    0.50    |    0.74       0.06   |
+  |`decoder-uout`        |   0.48    |   0.10  |     0.31    |    0.45    |    0.72       0.07   |
+  |`upper-uout`          |  *0.56*   |  *0.09* |     0.31    |   *0.57*   |    0.72      *0.05*   |
+  |`all-uout`            |   0.52    |   0.10  |     0.31    |    0.51    |    0.76       0.06   |
 
 (Best results in each category italicized).
 
